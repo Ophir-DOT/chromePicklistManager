@@ -1,0 +1,37 @@
+/* Floating Action Button */
+.sf-pm-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+}
+
+.sf-pm-fab-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #0176d3;
+  border: none;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.sf-pm-fab-button:hover {
+  background-color: #014486;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: scale(1.1);
+}
+
+.sf-pm-fab-button:active {
+  transform: scale(0.95);
+}
+
+.sf-pm-fab-button svg {
+  width: 24px;
+  height: 24px;
+}

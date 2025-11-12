@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Salesforce Picklist Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Picklist Manager</h1>
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-indicator"></span>
+        <span class="status-text">Not Connected</span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="export">Export</button>
+      <button class="tab" data-tab="compare">Compare</button>
+      <button class="tab" data-tab="deploy">Deploy</button>
+    </nav>
+
+    <!-- Export Tab -->
+    <div class="tab-content active" id="export-tab">
+      <section class="section">
+        <h2>Select Objects</h2>
+        <div class="object-selector">
+          <input type="text" id="objectSearch" placeholder="Search objects...">
+          <div class="object-list" id="objectList">
+            <!-- Populated dynamically -->
+          </div>
+          <div class="button-group">
+            <button id="selectAllObjects">Select All</button>
+            <button id="clearSelection">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Export Options</h2>
+        <label>
+          <input type="checkbox" id="includeValues" checked> Picklist Values
+        </label>
+        <label>
+          <input type="checkbox" id="includeDependencies" checked> Field Dependencies
+        </label>
+        <label>
+          <input type="checkbox" id="includeRecordTypes" checked> Record Type Mappings
+        </label>
+      </section>
+
+      <button id="exportButton" class="primary-button">Export Selected</button>
+
+      <div id="exportResults" class="results"></div>
+    </div>
+
+    <!-- Compare Tab -->
+    <div class="tab-content" id="compare-tab">
+      <section class="section">
+        <h2>Source Org</h2>
+        <div id="sourceOrg" class="org-info">
+          <p>Current Org: <span id="sourceOrgName">Loading...</span></p>
+        </div>
+        <button id="loadSourceData">Load Source Data</button>
+      </section>
+
+      <section class="section">
+        <h2>Target Org</h2>
+        <input type="file" id="targetDataFile" accept=".json">
+        <p class="help-text">Upload exported JSON from target org</p>
+      </section>
+
+      <button id="compareButton" class="primary-button">Compare</button>
+
+      <div id="compareResults" class="results">
+        <!-- Diff viewer populated here -->
+      </div>
+    </div>
+
+    <!-- Deploy Tab -->
+    <div class="tab-content" id="deploy-tab">
+      <section class="section">
+        <h2>Deploy Changes</h2>
+        <input type="file" id="deployFile" accept=".json">
+        <p class="help-text">Upload modified configuration JSON</p>
+      </section>
+
+      <section class="section">
+        <h2>Preview Changes</h2>
+        <div id="deployPreview" class="preview">
+          <!-- Preview populated here -->
+        </div>
+      </section>
+
+      <div class="deploy-options">
+        <label>
+          <input type="checkbox" id="checkOnly"> Validation Only (Check Only)
+        </label>
+        <label>
+          <input type="checkbox" id="rollbackOnError" checked> Rollback on Error
+        </label>
+      </div>
+
+      <button id="deployButton" class="primary-button">Deploy</button>
+
+      <div id="deployStatus" class="status">
+        <!-- Deploy status updates -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

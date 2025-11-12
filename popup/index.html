@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Salesforce Picklist Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Picklist Manager</h1>
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-indicator"></span>
+        <span class="status-text">Checking...</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- Main Menu View -->
+      <div id="mainView">
+        <section class="quick-actions">
+          <button id="exportBtn" class="action-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+            </svg>
+            Export Picklists
+          </button>
+
+          <button id="exportDepsBtn" class="action-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L2 7v10c0 5.5 4 10.6 10 12 6-1.4 10-6.5 10-12V7l-10-5zm0 10l-5 3V9l5-3 5 3v6l-5-3z"/>
+            </svg>
+            Export Dependencies
+          </button>
+
+          <button id="compareBtn" class="action-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/>
+            </svg>
+            Compare Orgs
+          </button>
+
+          <button id="deployBtn" class="action-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            Deploy Changes
+          </button>
+        </section>
+
+        <section class="info">
+          <div id="currentOrg" class="info-item">
+            <strong>Current Org:</strong>
+            <span id="orgUrl">Not connected</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- Export View -->
+      <div id="exportView" class="hidden">
+        <div class="view-header">
+          <button id="backBtn" class="back-button">← Back</button>
+          <h2>Export Picklists</h2>
+        </div>
+
+        <div class="export-content">
+          <div class="search-box">
+            <input type="text" id="objectSearch" placeholder="Search objects...">
+          </div>
+
+          <div class="loading-message" id="loadingObjects">
+            Loading objects...
+          </div>
+
+          <div class="object-list" id="objectList">
+            <!-- Objects will be populated here -->
+          </div>
+
+          <div class="selection-info" id="selectionInfo">
+            0 objects selected
+          </div>
+
+          <div class="button-group">
+            <button id="selectAllBtn" class="secondary-button">Select All</button>
+            <button id="clearBtn" class="secondary-button">Clear</button>
+          </div>
+
+          <button id="doExportBtn" class="primary-button" disabled>
+            Export Selected Objects
+          </button>
+
+          <div id="exportStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Export Dependencies View -->
+      <div id="exportDepsView" class="hidden">
+        <div class="view-header">
+          <button id="backFromDepsBtn" class="back-button">← Back</button>
+          <h2>Export Dependencies</h2>
+        </div>
+
+        <div class="export-content">
+          <div class="search-box">
+            <input type="text" id="depsObjectSearch" placeholder="Search objects...">
+          </div>
+
+          <div class="loading-message" id="loadingDepsObjects">
+            Loading objects...
+          </div>
+
+          <div class="object-list" id="depsObjectList">
+            <!-- Objects will be populated here with radio buttons -->
+          </div>
+
+          <div class="selection-info" id="depsSelectionInfo">
+            No object selected
+          </div>
+
+          <button id="doExportDepsBtn" class="primary-button" disabled>
+            Export Dependencies for Selected Object
+          </button>
+
+          <div id="exportDepsStatus" class="status-message"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <small>v1.0.0</small>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

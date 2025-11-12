@@ -1,0 +1,64 @@
+{
+  "manifest_version": 3,
+  "name": "Salesforce Picklist Manager",
+  "version": "1.0.0",
+  "description": "Export, compare, and deploy picklist values and dependencies across Salesforce orgs",
+
+  "permissions": [
+    "cookies",
+    "storage",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://*.salesforce.com/*",
+    "https://*.salesforce-setup.com/*",
+    "https://*.force.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.visualforce.com/*",
+    "https://*.lightning.force.com/*",
+    "https://*.my.salesforce.com/*",
+    "https://*.vf.force.com/*",
+    "https://*.salesforce.mil/*"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.salesforce.com/*",
+        "https://*.lightning.force.com/*",
+        "https://*.force.com/*"
+      ],
+      "js": ["content/injector.js"],
+      "css": ["content/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "sidepanel.html"],
+      "matches": ["https://*.salesforce.com/*", "https://*.force.com/*"]
+    }
+  ]
+}
