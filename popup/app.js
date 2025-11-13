@@ -24,6 +24,7 @@ let previewData = null;
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   await checkConnection();
+  await checkForUpdates();
   setupEventListeners();
 });
 
@@ -1293,4 +1294,46 @@ function resetUpdatePicklistView() {
   document.getElementById('previewArea').classList.add('hidden');
   document.getElementById('updatePicklistStatus').textContent = '';
   document.getElementById('updatePicklistStatus').className = 'status-message';
+}
+
+// ============================================================================
+// UPDATE CHECKER
+// ============================================================================
+
+async function checkForUpdates() {
+  try {
+    // Get update status from storage (set by background worker)
+    const result = await chrome.storage.local.get([
+      'updateAvailable',
+      'latestVersion',
+      'downloadUrl'
+    ]);
+
+    if (result.updateAvailable) {
+      showUpdateBanner(result.latestVersion, result.downloadUrl);
+    }
+  } catch (error) {
+    console.error('[Popup] Error checking for updates:', error);
+    // Silently fail - don't disrupt user experience
+  }
+}
+
+function showUpdateBanner(version, downloadUrl) {
+  const banner = document.getElementById('updateBanner');
+  const versionSpan = document.getElementById('updateVersion');
+  const downloadBtn = document.getElementById('downloadUpdateBtn');
+  const dismissBtn = document.getElementById('dismissUpdateBtn');
+
+  versionSpan.textContent = `Version ${version} is ready`;
+  banner.classList.remove('hidden');
+
+  // Download button handler
+  downloadBtn.onclick = () => {
+    chrome.tabs.create({ url: downloadUrl });
+  };
+
+  // Dismiss button handler
+  dismissBtn.onclick = () => {
+    banner.classList.add('hidden');
+  };
 }

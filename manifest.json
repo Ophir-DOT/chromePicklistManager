@@ -7,7 +7,8 @@
   "permissions": [
     "cookies",
     "storage",
-    "scripting"
+    "scripting",
+    "notifications"
   ],
 
   "host_permissions": [
@@ -19,7 +20,8 @@
     "https://*.lightning.force.com/*",
     "https://*.my.salesforce.com/*",
     "https://*.vf.force.com/*",
-    "https://*.salesforce.mil/*"
+    "https://*.salesforce.mil/*",
+    "https://api.github.com/*"
   ],
 
   "background": {
@@ -57,7 +59,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["assets/*", "sidepanel.html"],
+      "resources": ["assets/*"],
       "matches": ["https://*.salesforce.com/*", "https://*.force.com/*"]
     }
   ]

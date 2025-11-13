@@ -2,10 +2,25 @@ import SessionManager from './session-manager.js';
 import MetadataAPI from './metadata-api.js';
 import StorageManager from './storage-manager.js';
 import SalesforceAPI from './api-client.js';
+import UpdateChecker from './update-checker.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Salesforce Picklist Manager installed');
+
+  // Initialize update checker
+  UpdateChecker.initialize();
+});
+
+// Initialize update checker on startup
+chrome.runtime.onStartup.addListener(() => {
+  console.log('Salesforce Picklist Manager started');
+  UpdateChecker.initialize();
+});
+
+// Handle notification clicks
+chrome.notifications.onClicked.addListener((notificationId) => {
+  UpdateChecker.handleNotificationClick(notificationId);
 });
 
 // Message handler - routes requests to appropriate services
