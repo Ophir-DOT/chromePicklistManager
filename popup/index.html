@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Salesforce Picklist Manager</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="../lib/jszip.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -122,6 +123,60 @@
           </button>
 
           <div id="exportDepsStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Update Picklist View -->
+      <div id="updatePicklistView" class="hidden">
+        <div class="view-header">
+          <button id="backFromUpdateBtn" class="back-button">← Back</button>
+          <h2>Update Picklist Values</h2>
+        </div>
+
+        <div class="export-content">
+          <div class="form-section">
+            <label for="updateObjectSelect">Select Object:</label>
+            <select id="updateObjectSelect" class="form-select">
+              <option value="">-- Select Object --</option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <label for="updateFieldSelect">Select Picklist Field:</label>
+            <select id="updateFieldSelect" class="form-select" disabled>
+              <option value="">-- Select Field --</option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <label for="csvTextarea">Paste CSV Values (one per line):</label>
+            <textarea id="csvTextarea" class="csv-textarea" placeholder="PicklistValue&#10;Value1&#10;Value2&#10;Value3" rows="10"></textarea>
+          </div>
+
+          <div class="form-section">
+            <label class="checkbox-label">
+              <input type="checkbox" id="overwriteCheckbox">
+              <span>Overwrite existing values (if unchecked, will add to existing)</span>
+            </label>
+            <div class="help-text">
+              When checked: Only CSV values will be active, all others will be deactivated.<br>
+              When unchecked: CSV values will be added to existing active values.
+            </div>
+          </div>
+
+          <button id="previewChangesBtn" class="primary-button" disabled>
+            Preview Changes
+          </button>
+
+          <div id="previewArea" class="preview-area hidden">
+            <h3>Preview Changes</h3>
+            <div id="previewContent"></div>
+            <button id="deployPicklistBtn" class="primary-button">
+              Download Package & Deploy
+            </button>
+          </div>
+
+          <div id="updatePicklistStatus" class="status-message"></div>
         </div>
       </div>
     </main>

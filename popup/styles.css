@@ -328,3 +328,169 @@ footer {
   color: #999;
   font-size: 13px;
 }
+
+/* Update Picklist View Styles */
+.form-section {
+  margin-bottom: 16px;
+}
+
+.form-section label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #0176d3;
+}
+
+.form-select:disabled {
+  background: #f3f3f3;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.csv-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 150px;
+  transition: border-color 0.2s;
+}
+
+.csv-textarea:focus {
+  outline: none;
+  border-color: #0176d3;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-label span {
+  font-size: 13px;
+  color: #333;
+}
+
+.help-text {
+  margin-top: 6px;
+  margin-left: 24px;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.preview-area {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f9f9f9;
+}
+
+.preview-area h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.preview-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 4px;
+  background: white;
+}
+
+.preview-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-section.create h4 {
+  color: #4bca81;
+}
+
+.preview-section.activate h4 {
+  color: #0176d3;
+}
+
+.preview-section.deactivate h4 {
+  color: #c23934;
+}
+
+.preview-section.keep h4 {
+  color: #666;
+}
+
+.preview-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.preview-value {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: #f3f3f3;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.preview-section.create .preview-value {
+  background: #e8f7ed;
+  border-color: #4bca81;
+  color: #2d6e45;
+}
+
+.preview-section.activate .preview-value {
+  background: #e8f4fd;
+  border-color: #0176d3;
+  color: #014486;
+}
+
+.preview-section.deactivate .preview-value {
+  background: #fde8e8;
+  border-color: #c23934;
+  color: #8b2723;
+}
+
+.preview-count {
+  font-size: 12px;
+  color: #666;
+  font-weight: normal;
+}

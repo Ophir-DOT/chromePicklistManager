@@ -248,45 +248,58 @@ class MetadataAPI {
     };
   }
 
-  static async buildDeployPackage(metadataChanges) {
-    // Import JSZip dynamically
-    const JSZip = (await import('../lib/jszip.min.js')).default;
+  static async buildDeployPackageBlob(metadataChanges) {
+    // Use globally available JSZip (loaded via script tag in popup/index.html)
+    if (typeof JSZip === 'undefined') {
+      throw new Error('JSZip library not loaded. Please ensure jszip.min.js is included in your HTML.');
+    }
     const zip = new JSZip();
 
-    // Create package.xml
+    // Create package.xml at root
     const packageXml = this.buildPackageXml(metadataChanges);
     zip.file('package.xml', packageXml);
 
-    // Create objects folder
+    // Create "objects" folder
     const objectsFolder = zip.folder('objects');
 
-    // Add object metadata files
+    // Add CustomObject files (format: ObjectName.object)
+    // Each .object file contains ALL fields for that object
     for (const [objectName, fieldData] of Object.entries(metadataChanges)) {
-      const objectXml = this.buildObjectXml(objectName, fieldData);
+      const objectXml = this.buildCustomObjectXml(objectName, fieldData);
       objectsFolder.file(`${objectName}.object`, objectXml);
     }
 
-    // Generate zip and convert to base64
+    // Generate zip as blob (for download)
     const zipBlob = await zip.generateAsync({ type: 'blob' });
+    return zipBlob;
+  }
+
+  static async buildDeployPackage(metadataChanges) {
+    // Build ZIP blob first
+    const zipBlob = await this.buildDeployPackageBlob(metadataChanges);
+
+    // Convert to base64 for SOAP deployment
     const base64 = await this.blobToBase64(zipBlob);
 
     return base64;
   }
 
   static buildPackageXml(metadataChanges) {
-    const objectNames = Object.keys(metadataChanges);
-
+    // Build package.xml for CustomField deployments
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
   <types>`;
 
-    objectNames.forEach(objName => {
-      xml += `
-    <members>${objName}</members>`;
-    });
+    // Add each field as a member (format: ObjectName.FieldName)
+    for (const [objectName, fieldData] of Object.entries(metadataChanges)) {
+      for (const fieldName of Object.keys(fieldData)) {
+        xml += `
+    <members>${objectName}.${fieldName}</members>`;
+      }
+    }
 
     xml += `
-    <name>CustomObject</name>
+    <name>CustomField</name>
   </types>
   <version>${this.METADATA_API_VERSION}</version>
 </Package>`;
@@ -294,65 +307,114 @@ class MetadataAPI {
     return xml;
   }
 
-  static buildObjectXml(objectName, fieldData) {
+  static buildCustomObjectXml(objectName, fieldData) {
+    // Build CustomObject metadata XML (wraps all fields)
+    // Format matches working package (4) - uses CustomObject root with separate <fields> for each field
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">`;
 
-    // Add fields
+    // Add each field with its own <fields> wrapper
     for (const [fieldName, field] of Object.entries(fieldData)) {
       xml += `
-  <fields>
-    <fullName>${fieldName}</fullName>
-    <type>${field.type}</type>
-    <label>${field.label}</label>`;
+    <fields>
+        <fullName>${fieldName}</fullName>
+        <label>${this.escapeXml(field.label)}</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <trackTrending>false</trackTrending>
+        <type>${field.type}</type>`;
 
       if (field.values && field.values.length > 0) {
         xml += `
-    <valueSet>
-      <restricted>${field.restricted || false}</restricted>`;
-
-        if (field.controllingField) {
-          xml += `
-      <controllingField>${field.controllingField}</controllingField>`;
-        }
-
-        xml += `
-      <valueSetDefinition>`;
+        <valueSet>
+            <valueSetDefinition>
+                <sorted>false</sorted>`;
 
         field.values.forEach(value => {
           xml += `
-        <value>
-          <fullName>${value.fullName}</fullName>
-          <label>${value.label || value.fullName}</label>
-          <default>${value.default || false}</default>
-        </value>`;
+                <value>
+                    <fullName>${this.escapeXml(value.fullName)}</fullName>
+                    <default>${value.default || false}</default>
+                    <label>${this.escapeXml(value.label || value.fullName)}</label>
+                </value>`;
         });
 
         xml += `
-      </valueSetDefinition>`;
-
-        if (field.valueSettings && field.valueSettings.length > 0) {
-          field.valueSettings.forEach(vs => {
-            xml += `
-      <valueSettings>
-        <controllingFieldValue>${vs.controllingFieldValue}</controllingFieldValue>
-        <valueName>${vs.valueName}</valueName>
-      </valueSettings>`;
-          });
-        }
-
-        xml += `
-    </valueSet>`;
+            </valueSetDefinition>
+        </valueSet>`;
       }
 
       xml += `
-  </fields>`;
+    </fields>`;
     }
 
     xml += `
 </CustomObject>`;
 
     return xml;
+  }
+
+  static buildFieldXml(fieldName, field) {
+    // Build CustomField metadata XML (legacy method - not used for deployment)
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>${fieldName}</fullName>
+    <type>${field.type}</type>
+    <label>${this.escapeXml(field.label)}</label>`;
+
+    if (field.values && field.values.length > 0) {
+      xml += `
+    <valueSet>
+        <restricted>${field.restricted || false}</restricted>`;
+
+      if (field.controllingField) {
+        xml += `
+        <controllingField>${field.controllingField}</controllingField>`;
+      }
+
+      xml += `
+        <valueSetDefinition>`;
+
+      field.values.forEach(value => {
+        xml += `
+            <value>
+                <fullName>${this.escapeXml(value.fullName)}</fullName>
+                <label>${this.escapeXml(value.label || value.fullName)}</label>
+                <default>${value.default || false}</default>
+            </value>`;
+      });
+
+      xml += `
+        </valueSetDefinition>`;
+
+      if (field.valueSettings && field.valueSettings.length > 0) {
+        field.valueSettings.forEach(vs => {
+          xml += `
+        <valueSettings>
+            <controllingFieldValue>${this.escapeXml(vs.controllingFieldValue)}</controllingFieldValue>
+            <valueName>${this.escapeXml(vs.valueName)}</valueName>
+        </valueSettings>`;
+        });
+      }
+
+      xml += `
+    </valueSet>`;
+    }
+
+    xml += `
+</CustomField>`;
+
+    return xml;
+  }
+
+  static escapeXml(text) {
+    if (!text) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   static async blobToBase64(blob) {
