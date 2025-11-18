@@ -3,6 +3,7 @@ import MetadataAPI from './metadata-api.js';
 import StorageManager from './storage-manager.js';
 import SalesforceAPI from './api-client.js';
 import UpdateChecker from './update-checker.js';
+import HealthCheckAPI from './health-check-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -33,16 +34,36 @@ async function handleMessage(request, sender, sendResponse) {
   try {
     switch (request.action) {
       case 'GET_SESSION':
-        // If called from popup, get tab info from request
-        let tab = sender.tab;
-        if (!tab && request.tabId) {
-          tab = await chrome.tabs.get(request.tabId);
+        let session;
+
+        // If tabId or url provided, try to extract session from that tab
+        if (request.tabId || request.url) {
+          try {
+            let tab;
+            if (request.tabId) {
+              tab = await chrome.tabs.get(request.tabId);
+            } else if (request.url) {
+              tab = { url: request.url };
+            }
+
+            // Only extract if it's a Salesforce URL
+            if (tab && tab.url &&
+                !tab.url.startsWith('chrome-extension://') &&
+                (tab.url.includes('salesforce.com') || tab.url.includes('force.com'))) {
+              session = await SessionManager.extractSession(tab);
+            } else {
+              // Not a Salesforce tab, use stored session
+              session = await SessionManager.getCurrentSession();
+            }
+          } catch (error) {
+            console.warn('[ServiceWorker] Failed to extract session, trying stored session:', error.message);
+            session = await SessionManager.getCurrentSession();
+          }
+        } else {
+          // No tab info provided, use stored session
+          session = await SessionManager.getCurrentSession();
         }
-        if (!tab && request.url) {
-          // Construct a minimal tab object from URL
-          tab = { url: request.url };
-        }
-        const session = await SessionManager.extractSession(tab);
+
         sendResponse({ success: true, data: session });
         break;
 
@@ -79,6 +100,14 @@ async function handleMessage(request, sender, sendResponse) {
       case 'CHECK_FOR_UPDATES':
         await UpdateChecker.checkForUpdates();
         sendResponse({ success: true });
+        break;
+
+      case 'RUN_SINGLE_HEALTH_CHECK':
+        const checkResult = await HealthCheckAPI.runSingleCheck(
+          request.checkName,
+          request.customCheck
+        );
+        sendResponse({ success: true, result: checkResult });
         break;
 
       default:

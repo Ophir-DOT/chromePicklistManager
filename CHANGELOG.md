@@ -5,6 +5,32 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 1.2.0
+
+### Added
+- **Progressive DOT Health Check**: Complete UX overhaul for health check functionality
+  - Tab opens instantly (no more blocking loading overlay)
+  - Health checks execute sequentially with real-time progress updates
+  - Each check tile updates dynamically as it completes
+  - Progress indicator shows "X of N checks complete" at top of page
+  - Loading skeleton animations for tiles in progress
+  - Smooth transitions and professional UX
+  - PDF download enabled only after all checks complete
+  - Error tiles display errors without stopping remaining checks
+  - Includes both standard checks (6) and custom checks from settings
+  - Improved perceived performance (fast checks show results in 1-2 seconds)
+
+### Changed
+- Health Check button now opens new tab immediately instead of showing loading overlay
+- Health checks now execute sequentially rather than in parallel
+- Health check results display progressively instead of all at once
+
+### Technical
+- Added `health-check/` directory with standalone progressive health check page
+- Added `HealthCheckAPI.runSingleCheck()` method for individual check execution
+- Added `RUN_SINGLE_HEALTH_CHECK` message handler in service worker
+- Refactored health check UI to separate HTML/CSS/JS files
+
 ## [1.1.0] - 2025-11-15
 
 ### Added

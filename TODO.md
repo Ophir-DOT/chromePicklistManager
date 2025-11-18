@@ -4,109 +4,40 @@ This document outlines planned features and enhancements for the Salesforce Pick
 
 ---
 
-## 🎯 High Priority (P0) - Requested Features
+## ✅ Completed Features
 
-### 1. Dependency Loader
-**Description**: Export and import picklist field dependencies, similar to the current picklist value export/import functionality.
-
-**Features**:
-- Export field dependencies to CSV format
-- Import dependencies from CSV
-- Handle controlling/dependent field relationships
-- Manage record type specific picklist value assignments
-- Preview changes before deployment
+### 1. Dependency Loader ✅
+**Status**: Completed in v1.1.0
+**Implementation**: Export and import field dependencies and record type picklist mappings
+- Implemented in popup with dedicated "Export Dependencies" and "Dependency Loader" buttons
+- CSV export with controlling/dependent field relationships
+- Record type specific picklist value assignments
 - Deploy via Metadata API
 
-**Technical Approach**:
-- Use Metadata API `readMetadata` to read CustomObject with field dependencies
-- Parse `valueSettings` for controlling/dependent relationships
-- Parse `recordTypePicklists` for record type assignments
-- Build CustomObject XML with updated `valueSettings`
-- Deploy using existing Metadata API deployment pattern
+### 2. Automatic Update Checker ✅
+**Status**: Completed in v1.1.0
+**Implementation**: GitHub integration for automatic update notifications
+- Background worker checks for new releases every 24 hours
+- Update banner in popup when new version available
+- One-click download to latest release
+- Version comparison and notification system
+- Manual "Check for Updates" button in settings page
 
-**API Requirements**:
-- Metadata API (SOAP) - already implemented
-- CustomObject metadata type
-
-**Complexity**: Medium
-**Status**: Not Started
-
----
-
-### 2. Layout Field Extraction
-**Description**: Export all fields present on a Salesforce page layout, useful for documentation and impact analysis.
-
-**Features**:
-- Select an object and layout name
-- Export all fields on the layout to CSV
-- Include field metadata (API name, label, type, required, readonly)
-- Support for different layout types (standard, custom)
-- Include section names and field positioning
-
-**Technical Approach**:
-- Use Metadata API to read Layout metadata
-- Parse layout XML to extract field references
-- Use REST API describe to get field details
-- Generate CSV with layout structure and field metadata
-
-**CSV Format**:
-```
-Object,Layout Name,Section,Field API Name,Field Label,Field Type,Required,Readonly
-Account,Account Layout,Account Information,Name,Account Name,string,true,false
-```
-
-**API Requirements**:
-- Metadata API for reading Layout metadata
-- REST API `/describe` for field details
-
-**Complexity**: Medium
-**Status**: Not Started
+### 3. DOT Health Check ✅
+**Status**: Completed in v1.1.0
+**Implementation**: Comprehensive org health check with 6 validations
+- System Information: Organization details
+- Security Settings: Lightning Web Security validation
+- Org Limits: Data and file storage monitoring
+- API Usage: Daily API call limits tracking
+- Environment Settings: Closed system, lifecycle locks, URLs, Email Deliverability
+- Data Migration: Pre-migration data integrity checks
+- Exportable HTML reports with print-to-PDF functionality
+- Custom health checks support via Settings page
 
 ---
 
-### 3. Document Revision Sharing Query Helper
-**Description**: When viewing Document Revision records, automatically generate ContentVersion sharing queries based on PDF_ID and FILE_ID fields.
-
-**Features**:
-- Detect when on ContentDocumentLink or ContentVersion pages
-- Extract PDF_ID and FILE_ID from current Document Revision record
-- Auto-generate query: `SELECT Id, Title, FileType, OwnerId, CreatedDate FROM ContentVersion WHERE Id IN ('PDF_ID', 'FILE_ID')`
-- Query ContentDocumentLink for sharing information
-- Display results in popup or copy to clipboard
-- Option to execute query and show results
-
-**Technical Approach**:
-- Content script detects object type from URL
-- Extract field values from page DOM or via REST API
-- Build dynamic SOQL query with ID values
-- Execute query via REST API `/query` endpoint
-- Display results in formatted table
-- Join with ContentDocumentLink to show sharing
-
-**Example Query Flow**:
-```javascript
-// Step 1: Get PDF_ID and FILE_ID from Document Revision
-const revisionId = 'a1B3t000000XYZ';
-const pdfId = 'extractedPdfId';
-const fileId = 'extractedFileId';
-
-// Step 2: Query ContentVersion
-SELECT Id, Title, FileType, ContentDocumentId, OwnerId
-FROM ContentVersion
-WHERE Id IN ('pdfId', 'fileId')
-
-// Step 3: Query ContentDocumentLink for sharing
-SELECT ContentDocumentId, LinkedEntityId, ShareType, Visibility
-FROM ContentDocumentLink
-WHERE ContentDocumentId IN (contentDocumentIds)
-```
-
-**API Requirements**:
-- REST API `/query` for SOQL execution
-- DOM parsing or REST API for field extraction
-
-**Complexity**: Medium
-**Status**: Not Started
+## 🎯 High Priority (P0) - Requested Features
 
 ---
 
@@ -131,78 +62,9 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 5. Field Usage Analytics
-**Description**: Analyze which picklist values are actually being used in records.
-
-**Features**:
-- Query records to count usage per picklist value
-- Identify unused values (0 record count)
-- Show percentage distribution of values
-- Export usage report to CSV
-- Filter by date range or record type
-
-**Technical Approach**:
-- Build dynamic SOQL with GROUP BY on picklist field
-- Use Aggregate Query API for counts
-- Handle large data volumes with query batching
-
-**API Requirements**:
-- REST API `/query` with GROUP BY
-- Aggregate function support
-
-**Complexity**: Medium
-**Status**: Not Started
-
----
-
-### 6. Bulk Field Operations
-**Description**: Update multiple picklist fields across multiple objects in a single operation.
-
-**Features**:
-- Upload CSV with multiple objects/fields
-- Bulk preview all changes
-- Single deployment for all changes
-- Progress tracking for large operations
-
-**Complexity**: Large
-**Status**: Not Started
-
----
-
-### 7. Deployment Validation Mode
-**Description**: Test deployments before actually committing changes.
-
-**Features**:
-- Deploy with `checkOnly: true` flag
-- Show validation results and warnings
-- Allow user to confirm after successful validation
-- Display test coverage and deployment errors
-
-**API Requirements**:
-- Metadata API deploy with checkOnly parameter
-
-**Complexity**: Small
-**Status**: Not Started
-
----
-
-### 8. Deployment Rollback
-**Description**: Undo the last deployment made through the extension.
-
-**Features**:
-- Store deployment history with before/after states
-- One-click rollback to previous state
-- Preview rollback changes
-- Limit to last N deployments
-
-**Complexity**: Medium
-**Status**: Not Started
-
----
-
 ## 🎨 Low Priority (P2) - UX Improvements
 
-### 9. Side Panel UI
+### 5. Side Panel UI
 **Description**: Use Chrome's Side Panel API for persistent interface while browsing Salesforce.
 
 **Features**:
@@ -219,7 +81,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 10. Context Menu Integration
+### 6. Context Menu Integration
 **Description**: Right-click context menus on Salesforce pages for quick actions.
 
 **Features**:
@@ -236,7 +98,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 11. Auto-Detect Current Object/Field
+### 7. Auto-Detect Current Object/Field
 **Description**: Automatically populate object and field selections based on current Salesforce page.
 
 **Features**:
@@ -250,7 +112,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 12. Dark Mode Theme
+### 8. Dark Mode Theme
 **Description**: Add dark mode support for the extension popup.
 
 **Features**:
@@ -264,7 +126,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 13. Keyboard Shortcuts
+### 9. Keyboard Shortcuts
 **Description**: Power user navigation with keyboard shortcuts.
 
 **Features**:
@@ -281,7 +143,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 14. Field/Object Favorites
+### 10. Field/Object Favorites
 **Description**: Save frequently used objects and fields for quick access.
 
 **Features**:
@@ -297,7 +159,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ## 🚀 Future Ideas (P3)
 
-### 15. Picklist Value Reordering
+### 11. Picklist Value Reordering
 **Description**: Change the order of picklist values.
 
 **Complexity**: Medium
@@ -305,7 +167,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 16. Translation Workbench Support
+### 12. Translation Workbench Support
 **Description**: Export and import picklist value translations for multiple languages.
 
 **Complexity**: Large
@@ -313,7 +175,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 17. Default Value Management
+### 13. Default Value Management
 **Description**: Set and update default picklist values.
 
 **Complexity**: Small
@@ -321,7 +183,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 18. Restricted Picklist Toggle
+### 14. Restricted Picklist Toggle
 **Description**: Enable/disable restricted picklist mode for fields.
 
 **Complexity**: Small
@@ -329,7 +191,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 19. Field-Level Security Export
+### 15. Field-Level Security Export
 **Description**: Export field permissions across profiles and permission sets.
 
 **Complexity**: Large
@@ -337,7 +199,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 20. SOQL Query Builder
+### 16. SOQL Query Builder
 **Description**: Visual query builder for picklist analysis queries.
 
 **Complexity**: Large
@@ -345,7 +207,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 21. Deployment History Dashboard
+### 17. Deployment History Dashboard
 **Description**: Visual dashboard showing all deployments made via extension with filtering and search.
 
 **Complexity**: Medium
@@ -353,7 +215,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 22. Batch Export All Org Picklists
+### 18. Batch Export All Org Picklists
 **Description**: Background job to export all picklist fields in the entire org at once.
 
 **Complexity**: Large
@@ -361,7 +223,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 23. Org Comparison Tool Enhancement
+### 19. Org Comparison Tool Enhancement
 **Description**: Full comparison between two orgs with diff visualization and sync capabilities.
 
 **Complexity**: Large
@@ -369,7 +231,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 24. Export Format Options
+### 20. Export Format Options
 **Description**: Support additional export formats (JSON, Excel, XML).
 
 **Complexity**: Medium
@@ -377,7 +239,7 @@ WHERE ContentDocumentId IN (contentDocumentIds)
 
 ---
 
-### 25. Controlling Field Dependency Creator
+### 21. Controlling Field Dependency Creator
 **Description**: Create new field dependencies, not just read existing ones.
 
 **Complexity**: Large
@@ -478,4 +340,4 @@ If you'd like to contribute to any of these features:
 ---
 
 **Last Updated**: 2025-11-18
-**Extension Version**: 1.1.0
+**Extension Version**: 1.2.0

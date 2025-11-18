@@ -25,7 +25,7 @@ const EXPECTED_VALUES = {
 
 class HealthCheckAPI {
   /**
-   * Execute API call with session using XMLHttpRequest
+   * Execute API call with session using fetch API (service worker compatible)
    */
   static async executeQuery(endpoint, method = 'GET') {
     const session = await SessionManager.getCurrentSession();
@@ -36,41 +36,35 @@ class HealthCheckAPI {
 
     const fullUrl = new URL(endpoint, session.instanceUrl);
 
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open(method, fullUrl.toString(), true);
+    try {
+      const response = await fetch(fullUrl.toString(), {
+        method: method,
+        headers: {
+          'Authorization': 'Bearer ' + session.sessionId,
+          'Accept': 'application/json; charset=UTF-8',
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
 
-      // Set headers
-      xhr.setRequestHeader('Authorization', 'Bearer ' + session.sessionId);
-      xhr.setRequestHeader('Accept', 'application/json; charset=UTF-8');
-      xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-
-      // Set response type
-      xhr.responseType = 'json';
-
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else if (xhr.status === 401) {
-            reject(new Error('Session expired. Please refresh the Salesforce page.'));
-          } else if (xhr.status === 403) {
-            reject(new Error('Access denied. Check your permissions.'));
-          } else {
-            const errorMessage = xhr.response
-              ? JSON.stringify(xhr.response)
-              : xhr.statusText;
-            reject(new Error(`API Error ${xhr.status}: ${errorMessage}`));
-          }
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired. Please refresh the Salesforce page.');
+        } else if (response.status === 403) {
+          throw new Error('Access denied. Check your permissions.');
+        } else {
+          const errorText = await response.text();
+          throw new Error(`API Error ${response.status}: ${errorText}`);
         }
-      };
+      }
 
-      xhr.onerror = () => reject(new Error('Network error'));
-      xhr.timeout = 30000;
-      xhr.ontimeout = () => reject(new Error('Request timeout'));
-
-      xhr.send();
-    });
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -720,6 +714,56 @@ class HealthCheckAPI {
         name: customCheck.title,
         status: 'error',
         message: error.message,
+        fields: []
+      };
+    }
+  }
+
+  /**
+   * Run a single health check by name
+   * @param {string} checkName - Name of the check to run
+   * @param {object} customCheck - Custom check object (if checkName is 'custom')
+   * @returns {Promise<object>} - Check result
+   */
+  static async runSingleCheck(checkName, customCheck = null) {
+    console.log('[HealthCheckAPI] Running single check:', checkName);
+
+    try {
+      // Map check names to validation methods
+      switch (checkName) {
+        case 'System Information':
+          return await this.validateEnvironmentSettings();
+
+        case 'Security Settings':
+          return await this.validateSecuritySettings();
+
+        case 'Org Limits':
+          return await this.validateOrgLimits();
+
+        case 'API Usage':
+          return await this.validateAPIUsage();
+
+        case 'Environment Settings':
+          return await this.validateESignatureSettings();
+
+        case 'Data Migration':
+          return await this.validateDataMigration();
+
+        case 'custom':
+          if (!customCheck) {
+            throw new Error('Custom check object is required for custom checks');
+          }
+          return await this.executeCustomCheck(customCheck);
+
+        default:
+          throw new Error(`Unknown check name: ${checkName}`);
+      }
+    } catch (error) {
+      console.error(`[HealthCheckAPI] Error running check "${checkName}":`, error);
+      return {
+        name: checkName,
+        status: 'error',
+        message: error.message || 'Unknown error occurred',
         fields: []
       };
     }

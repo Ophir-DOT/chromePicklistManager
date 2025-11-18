@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Salesforce Picklist Manager",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Export, compare, and deploy picklist values and dependencies across Salesforce orgs",
 
   "permissions": [
