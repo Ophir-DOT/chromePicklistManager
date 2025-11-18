@@ -730,7 +730,7 @@ class HealthCheckAPI {
 
     try {
       // Step 1: Get PDF_ID__c and FILE_ID__c from Document Revision record
-      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_ID__c, CompSuite__FILE_ID__c,
+      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_Id__c, CompSuite__FILE_Id__c,
                              CompSuite__PDF_URL__c, CompSuite__File_URL__c
                              FROM CompSuite__Document_Revision__c
                              WHERE Id = '${recordId}'`;
@@ -746,16 +746,18 @@ class HealthCheckAPI {
       }
 
       const revision = revisionResult.records[0];
-      const pdfId = revision.CompSuite__PDF_ID__c;
-      const fileId = revision.CompSuite__FILE_ID__c;
+      // Use the exact case as it appears in the SOQL query
+      const pdfId = revision.CompSuite__PDF_Id__c;
+      const fileId = revision.CompSuite__FILE_Id__c;
 
       console.log('[HealthCheckAPI] Found revision:', revision.Name);
-      console.log('[HealthCheckAPI] PDF_ID:', pdfId, 'FILE_ID:', fileId);
+      console.log('[HealthCheckAPI] PDF_Id:', pdfId, 'FILE_Id:', fileId);
+      console.log('[HealthCheckAPI] Full revision object:', revision);
 
       if (!pdfId && !fileId) {
         return {
           status: 'warning',
-          message: 'No file IDs found on this Document Revision',
+          message: 'No file IDs found on this Document Revision1',
           summary: 'No files attached (PDF_ID and FILE_ID are both empty)'
         };
       }
