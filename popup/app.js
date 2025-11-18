@@ -4,6 +4,7 @@ import MetadataAPI from '../background/metadata-api.js';
 import ToolingAPI from '../background/tooling-api.js';
 import SessionManager from '../background/session-manager.js';
 import HealthCheckAPI from '../background/health-check-api.js';
+import ThemeManager from '../background/theme-manager.js';
 
 // Global state
 let allObjects = [];
@@ -28,6 +29,8 @@ let currentPageContext = null;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize theme first for smooth UX
+  await ThemeManager.initTheme();
   await checkConnection();
   await checkForUpdates();
   await updateCheckShareFilesButton();

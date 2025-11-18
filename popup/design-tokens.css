@@ -130,3 +130,80 @@
   --z-modal: 200;
   --z-tooltip: 300;
 }
+
+/* ============================================
+   DARK MODE TOKENS
+   ============================================ */
+
+[data-theme="dark"] {
+  /* Dark Mode Colors - Maintaining Dot Compliance brand identity */
+
+  /* Primary & Secondary Colors (adjusted for dark backgrounds) */
+  --brand-color-primary: #9B6DD6;        /* Lighter purple for dark mode readability */
+  --brand-color-secondary: #B88FE0;      /* Lighter purple variant */
+  --brand-color-cta: #FF1AA3;            /* Brighter pink for dark mode */
+
+  /* Background Colors */
+  --brand-color-bg-primary: #1a0a2e;     /* Very dark purple (almost black) */
+  --brand-color-bg-secondary: #2a1646;   /* Dark purple for cards/sections */
+  --brand-color-bg-tertiary: #3a2456;    /* Medium dark purple for hover states */
+
+  /* Pink Variants for Dark Mode */
+  --brand-color-link-bg: #4a1850;        /* Dark pink background for links */
+
+  /* Gray-Purple Variants for Dark Mode */
+  --brand-color-neutral-med: #8B7FA0;    /* Lighter gray-purple for better contrast */
+  --brand-color-neutral-light: #2a1646;  /* Dark background for separation */
+
+  /* Text Colors */
+  --brand-color-text-dark: #E8E4F0;      /* Light text for dark backgrounds */
+  --brand-color-text-light: #FFFFFF;     /* White text remains white */
+  --brand-color-text-muted: #A89BB8;     /* Muted text for less emphasis */
+
+  /* Accent Colors (adjusted for dark mode) */
+  --brand-color-accent-blue: #6AD4FF;    /* Brighter blue */
+  --brand-color-accent-green: #70FFDD;   /* Brighter green */
+  --brand-color-accent-gold: #FFCA7A;    /* Brighter gold */
+
+  /* Semantic Colors (dark mode variants) */
+  --color-success: #70FFDD;              /* Brighter green */
+  --color-success-bg: #1a3d35;
+  --color-success-text: #70FFDD;
+
+  --color-error: #FF6B6B;                /* Softer red */
+  --color-error-bg: #3d1a1a;
+  --color-error-text: #FF6B6B;
+
+  --color-info: #6AD4FF;                 /* Brighter blue */
+  --color-info-bg: #1a2d3d;
+  --color-info-text: #6AD4FF;
+
+  --color-warning: #FFCA7A;              /* Brighter gold */
+  --color-warning-bg: #3d2d1a;
+  --color-warning-text: #FFCA7A;
+
+  /* Borders in Dark Mode */
+  --border-color-primary: #4a2a66;       /* Dark purple border */
+  --border-color-secondary: #3a1646;     /* Darker purple border */
+
+  /* Shadows for Dark Mode (lighter, more subtle) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+  /* Input/Form Elements */
+  --input-bg: #2a1646;
+  --input-border: #4a2a66;
+  --input-text: #E8E4F0;
+  --input-placeholder: #8B7FA0;
+
+  /* Button States */
+  --button-bg-primary: #9B6DD6;
+  --button-bg-primary-hover: #B88FE0;
+  --button-bg-secondary: #3a2456;
+  --button-bg-secondary-hover: #4a2a66;
+
+  /* Scrollbar (dark mode) */
+  --scrollbar-thumb: #4a2a66;
+  --scrollbar-track: #2a1646;
+}

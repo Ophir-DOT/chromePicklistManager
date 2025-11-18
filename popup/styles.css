@@ -1120,3 +1120,88 @@ footer {
   margin: 4px 0;
   list-style-type: disc;
 }
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+[data-theme="dark"] body {
+  background: var(--brand-color-bg-primary);
+  color: var(--brand-color-text-dark);
+}
+
+/* Cards and Containers */
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .object-card,
+[data-theme="dark"] .field-selection-card,
+[data-theme="dark"] .query-card,
+[data-theme="dark"] .picklist-card,
+[data-theme="dark"] .deployment-status,
+[data-theme="dark"] .file-upload,
+[data-theme="dark"] .loader-status {
+  background: var(--brand-color-bg-secondary);
+}
+
+/* Inputs */
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="file"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] input[type="text"]::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--brand-color-neutral-med);
+}
+
+/* Code blocks and pre-formatted text */
+[data-theme="dark"] pre,
+[data-theme="dark"] code {
+  background: var(--brand-color-bg-primary);
+  border-color: var(--input-border);
+}
+
+/* Buttons */
+[data-theme="dark"] .btn-secondary {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--brand-color-cta);
+}
+
+/* Checkboxes and field items */
+[data-theme="dark"] .field-item,
+[data-theme="dark"] .checkbox-group label {
+  background: var(--brand-color-bg-tertiary);
+}
+
+/* Modals and overlays */
+[data-theme="dark"] .modal {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Status messages */
+[data-theme="dark"] .success-message,
+[data-theme="dark"] .error-message,
+[data-theme="dark"] .info-message {
+  border-color: currentColor;
+}
+
+/* Scrollbars (for webkit browsers) */
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--brand-color-bg-primary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--brand-color-neutral-med);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-color-primary);
+}

@@ -612,3 +612,69 @@ body {
     text-align: left;
   }
 }
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+[data-theme="dark"] body {
+  background: var(--brand-color-bg-primary);
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] .container {
+  background: var(--brand-color-bg-secondary);
+}
+
+/* Cards and tiles */
+[data-theme="dark"] .tile,
+[data-theme="dark"] .status-card,
+[data-theme="dark"] .object-card {
+  background: var(--brand-color-bg-tertiary);
+}
+
+/* Code and pre-formatted text */
+[data-theme="dark"] pre,
+[data-theme="dark"] code,
+[data-theme="dark"] .code-block {
+  background: var(--brand-color-bg-primary);
+  border-color: var(--input-border);
+}
+
+/* Inputs and forms */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--brand-color-text-dark);
+}
+
+/* Tables */
+[data-theme="dark"] table {
+  background: var(--brand-color-bg-tertiary);
+}
+
+[data-theme="dark"] th {
+  background: var(--brand-color-bg-primary);
+}
+
+[data-theme="dark"] td {
+  border-color: var(--input-border);
+}
+
+/* Buttons */
+[data-theme="dark"] .btn-secondary {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--input-border);
+}
+
+/* Loading skeleton */
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--brand-color-bg-primary) 25%,
+    var(--brand-color-bg-tertiary) 50%,
+    var(--brand-color-bg-primary) 75%
+  );
+}

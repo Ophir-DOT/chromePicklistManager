@@ -1,6 +1,8 @@
 // Progressive DOT Health Check
 // Executes health checks sequentially with real-time UI updates
 
+import ThemeManager from '../background/theme-manager.js';
+
 class ProgressiveHealthCheck {
   constructor() {
     this.checks = [];
@@ -14,6 +16,9 @@ class ProgressiveHealthCheck {
 
   async init() {
     console.log('[HealthCheck] Initializing progressive health check page...');
+
+    // Initialize theme
+    await ThemeManager.initTheme();
 
     // Set initial meta info
     await this.loadMetaInfo();

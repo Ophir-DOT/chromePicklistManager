@@ -15,6 +15,7 @@ class HealthCheckSettings {
     await this.loadVersionInfo();
     await this.checkUpdateStatus();
     await this.loadKeyboardShortcuts();
+    await this.initTheme();
   }
 
   setupEventListeners() {
@@ -38,6 +39,15 @@ class HealthCheckSettings {
     document.querySelectorAll('.shortcut-item').forEach(item => {
       item.addEventListener('click', () => {
         chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+      });
+    });
+
+    // Theme option change handlers
+    document.querySelectorAll('input[name="theme"]').forEach(radio => {
+      radio.addEventListener('change', async (e) => {
+        if (e.target.checked) {
+          await this.changeTheme(e.target.value);
+        }
       });
     });
 
@@ -368,6 +378,66 @@ class HealthCheckSettings {
     } catch (error) {
       console.error('[Settings] Error clearing shortcuts:', error);
       alert('Failed to clear shortcuts. Please try again.');
+    }
+  }
+
+  // ============================================================================
+  // THEME MANAGEMENT
+  // ============================================================================
+
+  async initTheme() {
+    try {
+      // Get saved theme preference
+      const result = await chrome.storage.local.get('themePreference');
+      const savedTheme = result.themePreference || 'system';
+
+      // Check the appropriate radio button
+      const radio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
+      if (radio) {
+        radio.checked = true;
+      }
+
+      // Apply the theme
+      await this.applyTheme(savedTheme);
+
+      console.log('[Settings] Theme initialized:', savedTheme);
+    } catch (error) {
+      console.error('[Settings] Error initializing theme:', error);
+    }
+  }
+
+  async changeTheme(theme) {
+    try {
+      console.log('[Settings] Changing theme to:', theme);
+
+      // Save to storage
+      await chrome.storage.local.set({ themePreference: theme });
+
+      // Apply theme
+      await this.applyTheme(theme);
+
+      console.log('[Settings] Theme changed successfully');
+    } catch (error) {
+      console.error('[Settings] Error changing theme:', error);
+    }
+  }
+
+  async applyTheme(preference) {
+    if (preference === 'system') {
+      // Follow system preference
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      this.setTheme(isDark ? 'dark' : 'light');
+    } else {
+      // Apply explicit theme
+      this.setTheme(preference);
+    }
+  }
+
+  setTheme(theme) {
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
     }
   }
 
