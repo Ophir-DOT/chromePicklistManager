@@ -10,13 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Focus: Advanced Administration & Security Features
 
 ### Planned
-- **Validation Rule Manager**: Comprehensive tool for managing validation rules
-  - Export all validation rules to CSV/JSON
-  - Disable/enable validation rules in bulk (useful during migrations)
-  - Test validation rules against sample data
-  - Search across validation rules by formula or error message
-  - Clone validation rules to other objects
-
 - **Profile/Permission Set Comparison & Import**: Security and compliance tool
   - Compare field-level security across profiles/permission sets
   - Identify permission gaps or over-privileges
@@ -37,29 +30,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Export comparison reports
   - Highlight differences with visual diff
 
+### Added
+- **Validation Rules Manager**: Comprehensive tool for managing Salesforce validation rules
+  - View all validation rules across all objects with summary statistics
+  - Filter by object, status (active/inactive), and search by name/formula/error message
+  - Bulk enable/disable validation rules (useful during data migrations)
+  - Export validation rules to CSV or JSON format
+  - View detailed rule information including formula, error message, and referenced fields
+  - Analysis tab with object coverage, warnings, and rule statistics
+  - Test validation rules against sample CSV data (client-side formula parsing)
+  - Settings for export format, managed package rules visibility, and bulk action confirmation
+  - Full dark mode support
+  - Added "Validation Rules Manager" button in Advanced Tools section
+  - Added `background/validation-rule-api.js` for Tooling API queries
+  - Added `validation-rules/` directory with HTML, CSS, JS files
+
 - **Dark Mode Theme**: Dot Compliance branded dark mode
-  - Toggle between light/dark themes
-  - Persist user preference
-  - Maintain brand colors in dark mode (Deep Purple #270648, Pink #DD0087)
-  - Smooth theme transitions
-  - Apply to popup, settings, and health check pages
-  - Update design tokens for dark mode variants
+  - Three theme options: Light, Dark, System (follows OS preference)
+  - Radio button interface with visual previews in Settings
+  - Persistent user preference stored in Chrome Storage
+  - Real-time system theme change detection
+  - Maintains brand colors in both modes (Deep Purple, Pink)
+  - Smooth CSS transitions (0.2s ease)
+  - Applied to all pages: popup, settings, health-check, batch-jobs
+  - 70+ CSS variables for consistent theming
+  - Added `background/theme-manager.js` module
 
 - **Batch Job Monitor**: Real-time async operation monitoring
-  - View all running/queued Apex jobs
-  - Monitor deployment queue
-  - Track long-running operations
-  - Quick abort capability
+  - View all running/queued AsyncApexJob records
+  - Three tabs: Active Jobs, Completed (last 24h), Scheduled
+  - Summary stats dashboard (Active, Queued, Completed, Failed)
+  - Job progress bars with percentage and item counts
+  - Quick abort capability for running jobs
   - Filter by job type (Batch, Future, Queueable, Scheduled)
-  - Show job progress and status
-  - Auto-refresh with configurable interval
-  - Email notifications for job completion/failure
-
-### Added
+  - Filter by status (Queued, Preparing, Processing, etc.)
+  - Search by Apex class name
+  - Auto-refresh with configurable interval (15s, 30s, 1m, 2m, 5m)
+  - Browser notifications for job completion/failure
+  - Job history configurable (1h, 6h, 24h, 48h, 7 days)
+  - Keyboard shortcut: `Ctrl+Shift+B` (Mac: `Cmd+Shift+B`)
+  - Full dark mode support
+  - Added "Advanced Tools" section divider in popup menu
 
 ### Changed
+- Updated popup menu with "Advanced Tools" section for new features
+- Moved "Check Share Files" button to Advanced Tools section
+- Added section divider styling with dark mode support
 
 ### Technical
+- Added `background/batch-job-api.js` for AsyncApexJob queries via Tooling API
+- Added `batch-jobs/` directory with HTML, CSS, JS for Batch Job Monitor UI
+- Added `handleBatchJobMonitor()` function in popup/app.js
+- Added keyboard shortcut `batch-job-monitor` in manifest.json commands
+- Added `.section-divider` CSS class for popup menu organization
+- Updated design-tokens.css with dark mode color variables
+- ThemeManager module with system preference detection via `prefers-color-scheme`
 
 ---
 

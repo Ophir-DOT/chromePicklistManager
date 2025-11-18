@@ -86,12 +86,12 @@
       },
       "description": "DOT Health Check"
     },
-    "check-share-files": {
+    "batch-job-monitor": {
       "suggested_key": {
-        "default": "Ctrl+Shift+F",
-        "mac": "Command+Shift+F"
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
       },
-      "description": "Check Share Files"
+      "description": "Batch Job Monitor"
     }
   }
 }

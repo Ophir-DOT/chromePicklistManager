@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validation Rules Manager - DOT Toolkit</title>
+  <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="../popup/design-tokens.css">
+  <link rel="stylesheet" href="validation-rules.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="header-content">
+        <h1>
+          <span class="material-symbols-rounded">rule</span>
+          Validation Rules Manager
+        </h1>
+        <div class="header-actions">
+          <button id="refreshBtn" class="btn btn-icon" title="Refresh">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+          <button id="exportBtn" class="btn btn-icon" title="Export">
+            <span class="material-symbols-rounded">download</span>
+          </button>
+          <button id="settingsBtn" class="btn btn-icon" title="Settings">
+            <span class="material-symbols-rounded">settings</span>
+          </button>
+        </div>
+      </div>
+      <div class="org-info">
+        <strong>Org:</strong> <span id="orgUrl">Loading...</span>
+      </div>
+    </header>
+
+    <!-- Settings Panel (hidden by default) -->
+    <div id="settingsPanel" class="settings-panel hidden">
+      <h3>Settings</h3>
+      <div class="setting-item">
+        <label for="defaultExportFormat">Default export format:</label>
+        <select id="defaultExportFormat">
+          <option value="csv" selected>CSV</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>
+          <input type="checkbox" id="showManagedRules" checked>
+          Show managed package rules
+        </label>
+      </div>
+      <div class="setting-item">
+        <label>
+          <input type="checkbox" id="confirmBulkActions" checked>
+          Confirm before bulk actions
+        </label>
+      </div>
+      <button id="closeSettingsBtn" class="btn btn-secondary">Close</button>
+    </div>
+
+    <!-- Export Panel (hidden by default) -->
+    <div id="exportPanel" class="export-panel hidden">
+      <h3>Export Validation Rules</h3>
+      <div class="export-options">
+        <div class="setting-item">
+          <label>Export format:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="exportFormat" value="csv" checked>
+              <span>CSV</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="exportFormat" value="json">
+              <span>JSON</span>
+            </label>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>
+            <input type="checkbox" id="exportSelectedOnly">
+            Export selected rules only
+          </label>
+        </div>
+      </div>
+      <div class="export-actions">
+        <button id="doExportBtn" class="btn btn-primary">
+          <span class="material-symbols-rounded">download</span>
+          Export
+        </button>
+        <button id="closeExportBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="summary-section">
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon total">rule</span>
+        <div class="stat-content">
+          <span class="stat-value" id="totalCount">-</span>
+          <span class="stat-label">Total Rules</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon active">check_circle</span>
+        <div class="stat-content">
+          <span class="stat-value" id="activeCount">-</span>
+          <span class="stat-label">Active</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon inactive">cancel</span>
+        <div class="stat-content">
+          <span class="stat-value" id="inactiveCount">-</span>
+          <span class="stat-label">Inactive</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon objects">category</span>
+        <div class="stat-content">
+          <span class="stat-value" id="objectCount">-</span>
+          <span class="stat-label">Objects</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="filter-group">
+        <label for="objectFilter">Object:</label>
+        <select id="objectFilter">
+          <option value="">All Objects</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter">
+          <option value="">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="filter-group search-group">
+        <input type="text" id="searchInput" placeholder="Search rules...">
+      </div>
+    </div>
+
+    <!-- Bulk Actions Bar -->
+    <div id="bulkActionsBar" class="bulk-actions-bar hidden">
+      <div class="bulk-info">
+        <span id="selectedCount">0</span> rules selected
+      </div>
+      <div class="bulk-buttons">
+        <button id="bulkActivateBtn" class="btn btn-success btn-sm">
+          <span class="material-symbols-rounded">check_circle</span>
+          Activate
+        </button>
+        <button id="bulkDeactivateBtn" class="btn btn-warning btn-sm">
+          <span class="material-symbols-rounded">cancel</span>
+          Deactivate
+        </button>
+        <button id="clearSelectionBtn" class="btn btn-secondary btn-sm">
+          Clear Selection
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="rules">
+        <span class="material-symbols-rounded">list</span>
+        Rules List
+        <span class="badge" id="rulesListBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="analysis">
+        <span class="material-symbols-rounded">analytics</span>
+        Analysis
+      </button>
+      <button class="tab-btn" data-tab="test">
+        <span class="material-symbols-rounded">science</span>
+        Test Rules
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Rules List Tab -->
+      <div id="rulesTab" class="tab-panel active">
+        <div class="rules-header">
+          <label class="select-all-label">
+            <input type="checkbox" id="selectAllRules">
+            <span>Select All</span>
+          </label>
+        </div>
+        <div id="rulesContainer" class="rules-container">
+          <div class="loading-message">
+            <span class="material-symbols-rounded spinning">sync</span>
+            Loading validation rules...
+          </div>
+        </div>
+        <div id="noRules" class="empty-state hidden">
+          <span class="material-symbols-rounded">rule_folder</span>
+          <p>No validation rules found</p>
+        </div>
+      </div>
+
+      <!-- Analysis Tab -->
+      <div id="analysisTab" class="tab-panel hidden">
+        <div id="analysisContainer" class="analysis-container">
+          <div class="loading-message">
+            <span class="material-symbols-rounded spinning">sync</span>
+            Analyzing validation rules...
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Tab -->
+      <div id="testTab" class="tab-panel hidden">
+        <div class="test-section">
+          <h3>Test Validation Rules</h3>
+          <p class="test-description">
+            Upload a CSV file with test data to check which validation rules would fire.
+          </p>
+
+          <div class="test-controls">
+            <div class="setting-item">
+              <label for="testObject">Select Object:</label>
+              <select id="testObject">
+                <option value="">Choose an object...</option>
+              </select>
+            </div>
+
+            <div class="file-upload">
+              <input type="file" id="csvFileInput" accept=".csv" hidden>
+              <button id="uploadCsvBtn" class="btn btn-secondary">
+                <span class="material-symbols-rounded">upload_file</span>
+                Upload CSV
+              </button>
+              <span id="fileName" class="file-name">No file selected</span>
+            </div>
+
+            <button id="runTestBtn" class="btn btn-primary" disabled>
+              <span class="material-symbols-rounded">play_arrow</span>
+              Run Test
+            </button>
+          </div>
+
+          <div id="testResults" class="test-results hidden">
+            <h4>Test Results</h4>
+            <div id="testResultsContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="confirmTitle">Confirm Action</h3>
+      <p id="confirmMessage">Are you sure you want to proceed?</p>
+      <div class="modal-actions">
+        <button id="confirmYesBtn" class="btn btn-primary">Confirm</button>
+        <button id="confirmNoBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rule Detail Modal -->
+  <div id="ruleDetailModal" class="modal hidden">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3 id="ruleDetailTitle">Rule Details</h3>
+        <button id="closeRuleDetailBtn" class="btn btn-icon">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+      <div id="ruleDetailContent" class="rule-detail-content">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="validation-rules.js"></script>
+</body>
+</html>

@@ -92,6 +92,8 @@ function setupEventListeners() {
   document.getElementById('compareBtn').addEventListener('click', handleCompare);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
   document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
+  document.getElementById('batchJobMonitorBtn').addEventListener('click', handleBatchJobMonitor);
+  document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
   // Export view buttons
@@ -1765,6 +1767,38 @@ async function handleHealthCheck() {
   } catch (error) {
     console.error('[Popup] Failed to open health check:', error);
     alert(`Failed to open health check: ${error.message}`);
+  }
+}
+
+function handleBatchJobMonitor() {
+  try {
+    console.log('[Popup] Opening Batch Job Monitor...');
+
+    const batchJobUrl = chrome.runtime.getURL('batch-jobs/batch-jobs.html');
+
+    chrome.tabs.create({ url: batchJobUrl }, (tab) => {
+      console.log('[Popup] Batch Job Monitor opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Batch Job Monitor:', error);
+    alert(`Failed to open Batch Job Monitor: ${error.message}`);
+  }
+}
+
+function handleValidationRules() {
+  try {
+    console.log('[Popup] Opening Validation Rules Manager...');
+
+    const validationRulesUrl = chrome.runtime.getURL('validation-rules/validation-rules.html');
+
+    chrome.tabs.create({ url: validationRulesUrl }, (tab) => {
+      console.log('[Popup] Validation Rules Manager opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Validation Rules Manager:', error);
+    alert(`Failed to open Validation Rules Manager: ${error.message}`);
   }
 }
 

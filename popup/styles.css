@@ -234,6 +234,32 @@ main {
   color: var(--brand-color-neutral-med);
 }
 
+/* Section Divider */
+.section-divider {
+  display: flex;
+  align-items: center;
+  margin: var(--spacing-md) 0;
+  gap: var(--spacing-sm);
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--brand-color-neutral-med);
+}
+
+.section-divider span {
+  font-family: var(--font-family-headline);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--brand-color-neutral-med);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
 /* Material Symbols Icon styling */
 .material-symbols-rounded {
   font-variation-settings:
@@ -1173,6 +1199,16 @@ footer {
 [data-theme="dark"] .btn-secondary:hover {
   background: var(--brand-color-bg-tertiary);
   border-color: var(--brand-color-cta);
+}
+
+/* Section divider */
+[data-theme="dark"] .section-divider::before,
+[data-theme="dark"] .section-divider::after {
+  background: var(--border-color-primary);
+}
+
+[data-theme="dark"] .section-divider span {
+  color: var(--brand-color-text-muted);
 }
 
 /* Checkboxes and field items */
