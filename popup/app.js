@@ -116,6 +116,9 @@ function setupEventListeners() {
   document.getElementById('csvTextarea').addEventListener('input', handleCSVInput);
   document.getElementById('previewChangesBtn').addEventListener('click', previewPicklistChanges);
   document.getElementById('deployPicklistBtn').addEventListener('click', deployPicklistChanges);
+
+  // Share Files view buttons
+  document.getElementById('backFromShareFilesBtn').addEventListener('click', showMainView);
 }
 
 async function showExportView() {
@@ -131,6 +134,7 @@ function showMainView() {
   document.getElementById('exportDepsView').classList.add('hidden');
   document.getElementById('dependencyLoaderView').classList.add('hidden');
   document.getElementById('updatePicklistView').classList.add('hidden');
+  document.getElementById('shareFilesView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
 
   // Reset state
@@ -1763,7 +1767,6 @@ async function handleHealthCheck() {
 
 async function updateCheckShareFilesButton() {
   const button = document.getElementById('checkShareFilesBtn');
-  const statusEl = document.getElementById('checkShareFilesStatus');
 
   try {
     // Get current tab
@@ -1788,11 +1791,9 @@ async function updateCheckShareFilesButton() {
         currentPageContext.recordId) {
       button.disabled = false;
       button.title = 'Check file sharing for this document revision';
-      statusEl.textContent = '';
     } else {
       button.disabled = true;
       button.title = 'Available only on CompSuite__Document_Revision__c record pages';
-      statusEl.textContent = '';
     }
 
   } catch (error) {
@@ -1802,19 +1803,30 @@ async function updateCheckShareFilesButton() {
 }
 
 async function handleCheckShareFiles() {
-  const statusEl = document.getElementById('checkShareFilesStatus');
-
   try {
     if (!currentPageContext || !currentPageContext.recordId) {
-      statusEl.textContent = 'Error: No record context available';
-      statusEl.className = 'status-message error';
+      alert('Error: No record context available');
       return;
     }
 
-    statusEl.textContent = 'Checking file sharing...';
-    statusEl.className = 'status-message loading';
+    // Navigate to share files view
+    document.getElementById('mainView').classList.add('hidden');
+    document.getElementById('shareFilesView').classList.remove('hidden');
+
+    const contentEl = document.getElementById('shareFilesContent');
+    contentEl.innerHTML = '<div class="loading-message">Loading share information...</div>';
 
     console.log('[Popup] Checking share files for record:', currentPageContext.recordId);
+
+    // Get current session for org URL
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const sessionResponse = await chrome.runtime.sendMessage({
+      action: 'GET_SESSION',
+      tabId: tab.id,
+      url: tab.url
+    });
+
+    const orgUrl = sessionResponse.success ? sessionResponse.data.instanceUrl : '';
 
     // Send message to background to run the check
     const response = await chrome.runtime.sendMessage({
@@ -1825,22 +1837,30 @@ async function handleCheckShareFiles() {
     if (response.success) {
       const result = response.data;
 
-      // Display inline summary
+      // Display results
       if (result.status === 'success') {
-        statusEl.innerHTML = `
-          <strong>Share Check Complete:</strong><br>
-          ${result.summary || 'Check completed successfully. See details below.'}
-        `;
-        statusEl.className = 'status-message success';
-
-        // Also log details for debugging
+        contentEl.innerHTML = buildShareFilesTable(result.data, orgUrl);
         console.log('[Popup] Share check results:', result);
-      } else {
-        statusEl.innerHTML = `
-          <strong>Check Failed:</strong><br>
-          ${result.message || 'Unknown error occurred'}
+
+        // Attach event listener to "Add Missing Links" button if it exists
+        const addLinksBtn = document.getElementById('addMissingLinksBtn');
+        if (addLinksBtn) {
+          addLinksBtn.addEventListener('click', () => handleAddMissingLinks(currentPageContext.recordId));
+        }
+      } else if (result.status === 'warning') {
+        contentEl.innerHTML = `
+          <div class="status-message warning">
+            <strong>Warning:</strong><br>
+            ${result.message || 'No files found to check'}
+          </div>
         `;
-        statusEl.className = 'status-message error';
+      } else {
+        contentEl.innerHTML = `
+          <div class="status-message error">
+            <strong>Check Failed:</strong><br>
+            ${result.message || 'Unknown error occurred'}
+          </div>
+        `;
       }
     } else {
       throw new Error(response.error || 'Unknown error');
@@ -1848,9 +1868,237 @@ async function handleCheckShareFiles() {
 
   } catch (error) {
     console.error('[Popup] Check share files error:', error);
-    statusEl.textContent = `Error: ${error.message}`;
-    statusEl.className = 'status-message error';
+    const contentEl = document.getElementById('shareFilesContent');
+    contentEl.innerHTML = `
+      <div class="status-message error">
+        Error: ${error.message}
+      </div>
+    `;
   }
+}
+
+async function handleAddMissingLinks(recordId) {
+  console.log('[Popup] Adding missing links for record:', recordId);
+
+  const statusEl = document.getElementById('addLinksStatus');
+  const btn = document.getElementById('addMissingLinksBtn');
+
+  try {
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-rounded icon">hourglass_empty</span> Adding Links...';
+    statusEl.innerHTML = '<div class="loading-message">Creating missing ContentDocumentLinks...</div>';
+
+    // Send message to background to add missing links
+    const response = await chrome.runtime.sendMessage({
+      action: 'ADD_MISSING_DOCUMENT_REVISION_LINKS',
+      recordId: recordId
+    });
+
+    if (response.success) {
+      const result = response.data;
+
+      if (result.status === 'success') {
+        if (result.created > 0) {
+          statusEl.innerHTML = `
+            <div class="status-message success">
+              <strong>Success!</strong> Created ${result.created} ContentDocumentLink(s) to ${escapeHtml(result.revisionLogName || 'Revision Log')}.
+              <br><br>
+              <button id="refreshSharesBtn" class="action-button">
+                <span class="material-symbols-rounded icon">refresh</span>
+                Refresh Shares
+              </button>
+            </div>
+          `;
+
+          // Attach refresh handler
+          const refreshBtn = document.getElementById('refreshSharesBtn');
+          if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+              handleCheckShareFiles();
+            });
+          }
+
+          // Hide the "Add Missing Links" button
+          btn.style.display = 'none';
+        } else {
+          statusEl.innerHTML = `
+            <div class="status-message success">
+              ${escapeHtml(result.message)}
+            </div>
+          `;
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-rounded icon">add_link</span> Add Missing Links';
+        }
+      } else if (result.status === 'warning') {
+        statusEl.innerHTML = `
+          <div class="status-message warning">
+            <strong>Warning:</strong> ${escapeHtml(result.message)}
+          </div>
+        `;
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-rounded icon">add_link</span> Add Missing Links';
+      } else {
+        throw new Error(result.message || 'Unknown error');
+      }
+    } else {
+      throw new Error(response.error || 'Unknown error');
+    }
+
+  } catch (error) {
+    console.error('[Popup] Add missing links error:', error);
+    statusEl.innerHTML = `
+      <div class="status-message error">
+        <strong>Error:</strong> ${escapeHtml(error.message)}
+      </div>
+    `;
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-rounded icon">add_link</span> Add Missing Links';
+  }
+}
+
+function buildShareFilesTable(data, orgUrl) {
+  if (!data || !data.files || data.files.length === 0) {
+    return '<div class="no-shares-message">No files found</div>';
+  }
+
+  let html = `
+    <div class="share-files-info">
+      <h3>Document Revision: ${escapeHtml(data.revisionName || 'N/A')}</h3>
+      <div class="info-row">
+        <span><strong>Record ID:</strong></span>
+        <span>${escapeHtml(data.revisionId)}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>State:</strong></span>
+        <span>${escapeHtml(data.stateName || 'Unknown')}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>Total Shares:</strong></span>
+        <span>${data.totalShares}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>Files:</strong></span>
+        <span>${data.files.length}</span>
+      </div>
+    </div>
+  `;
+
+  // Display validation results if available
+  if (data.validation) {
+    const validation = data.validation;
+    if (validation.isValid === true) {
+      html += `
+        <div class="validation-success">
+          <span class="material-symbols-rounded icon">check_circle</span>
+          <div>
+            <strong>Validation Passed:</strong> All required shares are present for state "${escapeHtml(validation.stateName)}"
+          </div>
+        </div>
+      `;
+    } else if (validation.isValid === false) {
+      // Check if missing links are for Document Revision Logs
+      const hasMissingRevisionLogLinks = validation.issues.some(issue =>
+        issue.includes('Document Revision Logs')
+      );
+
+      html += `
+        <div class="validation-error">
+          <span class="material-symbols-rounded icon">error</span>
+          <div>
+            <strong>Validation Failed:</strong>
+            <ul>
+              ${validation.issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('')}
+            </ul>
+            ${hasMissingRevisionLogLinks ? `
+              <button id="addMissingLinksBtn" class="action-button" style="margin-top: 12px;">
+                <span class="material-symbols-rounded icon">add_link</span>
+                Add Missing Links
+              </button>
+              <div id="addLinksStatus" style="margin-top: 8px;"></div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    if (validation.warnings && validation.warnings.length > 0) {
+      html += `
+        <div class="validation-warning">
+          <span class="material-symbols-rounded icon">warning</span>
+          <div>
+            <strong>Warnings:</strong>
+            <ul>
+              ${validation.warnings.map(warning => `<li>${escapeHtml(warning)}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  html += '<div class="share-files-table">';
+
+  // Build a table for each file
+  data.files.forEach(file => {
+    html += `
+      <div class="file-section">
+        <div class="file-header">
+          <span>${escapeHtml(file.title || 'Untitled')}</span>
+          <span class="file-type-badge">${escapeHtml(file.type)}</span>
+        </div>
+        <div class="file-info">
+          <strong>Version ID:</strong> ${escapeHtml(file.versionId)} |
+          <strong>Document ID:</strong> ${escapeHtml(file.documentId)} |
+          <strong>Shares:</strong> ${file.shareCount}
+        </div>
+    `;
+
+    if (file.shares && file.shares.length > 0) {
+      html += `
+        <table class="shares-table">
+          <thead>
+            <tr>
+              <th style="width: 35%">Linked Entity ID</th>
+              <th style="width: 25%">Object Name</th>
+              <th style="width: 20%">Share Type</th>
+              <th style="width: 20%">Visibility</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      file.shares.forEach(share => {
+        // Create clickable link to the record
+        const recordUrl = orgUrl ? `${orgUrl}/${share.linkedEntityId}` : '#';
+        const linkedEntityHtml = orgUrl
+          ? `<a href="${recordUrl}" target="_blank" class="entity-link">${escapeHtml(share.linkedEntityId)}</a>`
+          : escapeHtml(share.linkedEntityId);
+
+        html += `
+          <tr>
+            <td>${linkedEntityHtml}</td>
+            <td><span class="object-name-badge">${escapeHtml(share.objectName || 'Unknown')}</span></td>
+            <td><span class="share-type-badge">${escapeHtml(share.shareType)}</span></td>
+            <td><span class="visibility-badge">${escapeHtml(share.visibility)}</span></td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+    } else {
+      html += '<div class="no-shares-message">No shares found for this file</div>';
+    }
+
+    html += '</div>';
+  });
+
+  html += '</div>';
+
+  return html;
 }
 
 function generateHealthCheckReport(results) {
@@ -1901,7 +2149,7 @@ function buildHealthCheckHTML(results) {
     </div>
 
     <footer class="report-footer no-print">
-      <p>Generated by Salesforce Picklist Manager Extension v1.1.0</p>
+      <p>Generated by DOT Toolkit v1.3.0</p>
     </footer>
   </div>
 

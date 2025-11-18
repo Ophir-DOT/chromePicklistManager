@@ -117,6 +117,13 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, data: shareCheckResult });
         break;
 
+      case 'ADD_MISSING_DOCUMENT_REVISION_LINKS':
+        const addLinksResult = await HealthCheckAPI.addMissingDocumentRevisionLinks(
+          request.recordId
+        );
+        sendResponse({ success: true, data: addLinksResult });
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown action' });
     }

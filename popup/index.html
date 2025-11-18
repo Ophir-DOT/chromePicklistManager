@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Salesforce Picklist Manager</title>
+  <title>DOT Toolkit</title>
   <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>Picklist Manager</h1>
+      <h1>DOT Toolkit</h1>
       <div class="connection-status" id="connectionStatus">
         <span class="status-indicator"></span>
         <span class="status-text">Checking...</span>
@@ -83,8 +83,6 @@
             Settings
           </button>
         </section>
-
-        <div id="checkShareFilesStatus" class="status-message"></div>
 
         <section class="info">
           <div id="currentOrg" class="info-item">
@@ -250,6 +248,20 @@
           </div>
 
           <div id="updatePicklistStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Share Files View -->
+      <div id="shareFilesView" class="hidden">
+        <div class="view-header">
+          <button id="backFromShareFilesBtn" class="back-button">← Back</button>
+          <h2>Document Sharing Details</h2>
+        </div>
+
+        <div class="export-content">
+          <div id="shareFilesContent">
+            <div class="loading-message">Loading share information...</div>
+          </div>
         </div>
       </div>
     </main>

@@ -26,10 +26,23 @@ A Chrome extension for managing Salesforce picklist configurations, field depend
     - Missing Content Document Links verification (expected: 0)
     - Contextual help text with actionable remediation steps for failures
   - Exportable HTML reports with print-to-PDF functionality
+- **Check Share Files**: Document revision file sharing analysis and repair
+  - Analyzes ContentDocumentLink sharing for document revisions
+  - Context-aware: Only enabled on CompSuite__Document_Revision__c record pages
+  - Displays PDF and FILE sharing details with validation
+  - **Add Missing Links**: One-click creation of missing ContentDocumentLinks
+    - Automatically finds matching Revision Log by version number
+    - Creates missing links to Document Revision Logs
+    - Real-time status feedback and validation refresh
 - **Automatic Updates**: GitHub integration for update notifications
   - Automatic checks every 24 hours
   - Manual "Check for Updates" in settings page
   - Update banner with download link
+- **Keyboard Shortcuts**: Global shortcuts for quick access
+  - Export Picklists: `Ctrl+Shift+E` (Mac: `Cmd+Shift+E`)
+  - Picklist Loader: `Ctrl+Shift+L` (Mac: `Cmd+Shift+L`)
+  - DOT Health Check: `Ctrl+Shift+H` (Mac: `Cmd+Shift+H`)
+  - Check Share Files: `Ctrl+Shift+F` (Mac: `Cmd+Shift+F`)
 - **Compare Orgs**: Compare picklist configurations between different orgs
 
 ## Installation
@@ -67,7 +80,9 @@ When extension shows "Update Available":
    - **Picklist Loader**: Import CSV and deploy picklist changes
    - **Dependency Loader**: Import CSV and deploy field dependencies
    - **DOT Health Check**: Run org health validation
+   - **Check Share Files**: Analyze and fix document revision file sharing (context-aware)
    - **Compare Orgs**: Compare configurations across orgs
+5. Or use keyboard shortcuts for quick access (see Features section)
 
 ## Architecture
 

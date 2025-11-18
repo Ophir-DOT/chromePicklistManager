@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Displays inline summary with share counts per file
   - Provides detailed sharing information (LinkedEntityId, ShareType, Visibility)
   - Smart context detection for Lightning and Classic UI
+  - **NEW: Add Missing Links** - Automatically create missing ContentDocumentLinks
+    - Intelligent button shown when validation detects missing Document Revision Log links
+    - Finds matching Revision Log record with same version number (CompSuite__Version__c)
+    - Creates ContentDocumentLinks for both PDF and FILE to the Revision Log
+    - One-click operation with real-time status feedback
+    - Success confirmation with "Refresh Shares" button to verify changes
+    - Proper error handling with user-friendly messages
 
 - **Keyboard Shortcuts**: Global keyboard shortcuts for main features
   - **Export Picklists**: `Ctrl+Shift+E` (Mac: `Cmd+Shift+E`)
@@ -47,7 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New method: `HealthCheckAPI.checkDocumentRevisionSharing(recordId)`
   - Multi-step SOQL query process for file sharing analysis
   - Returns structured data with share counts and details
+- New method: `HealthCheckAPI.addMissingDocumentRevisionLinks(recordId)`
+  - Queries Document Revision for Version number (CompSuite__Version__c)
+  - Finds matching Revision Log with same version number
+  - Checks existing ContentDocumentLinks to avoid duplicates
+  - Creates missing links via REST API (ShareType: 'V', Visibility: 'AllUsers')
+  - Returns detailed result with created link IDs and Revision Log information
 - Added `CHECK_DOCUMENT_REVISION_SHARING` message handler
+- Added `ADD_MISSING_DOCUMENT_REVISION_LINKS` message handler in service-worker.js
+- Updated `buildShareFilesTable()` to conditionally show "Add Missing Links" button
+- New function: `handleAddMissingLinks(recordId)` in popup/app.js
+  - Handles button click, disables during operation, shows progress
+  - Displays success message with created link count
+  - Provides "Refresh Shares" button to re-run validation
 - New keyboard shortcuts section in settings page with full styling
 - Updated `settings.js` with shortcuts management logic
   - `loadKeyboardShortcuts()` - Load and display current shortcuts

@@ -729,9 +729,10 @@ class HealthCheckAPI {
     console.log('[HealthCheckAPI] Checking document revision sharing for:', recordId);
 
     try {
-      // Step 1: Get PDF_ID__c and FILE_ID__c from Document Revision record
-      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_Id__c, CompSuite__FILE_Id__c,
-                             CompSuite__PDF_URL__c, CompSuite__File_URL__c
+      // Step 1: Get PDF_ID__c, FILE_ID__c, and State from Document Revision record
+      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_Id__c, CompSuite__File_Id__c,
+                             CompSuite__PDF_URL__c, CompSuite__File_URL__c,
+                             CompSuite__State__r.Name
                              FROM CompSuite__Document_Revision__c
                              WHERE Id = '${recordId}'`;
 
@@ -748,10 +749,12 @@ class HealthCheckAPI {
       const revision = revisionResult.records[0];
       // Use the exact case as it appears in the SOQL query
       const pdfId = revision.CompSuite__PDF_Id__c;
-      const fileId = revision.CompSuite__FILE_Id__c;
+      const fileId = revision.CompSuite__File_Id__c;
+      const stateName = revision.CompSuite__State__r?.Name || '';
 
       console.log('[HealthCheckAPI] Found revision:', revision.Name);
       console.log('[HealthCheckAPI] PDF_Id:', pdfId, 'FILE_Id:', fileId);
+      console.log('[HealthCheckAPI] State:', stateName);
       console.log('[HealthCheckAPI] Full revision object:', revision);
 
       if (!pdfId && !fileId) {
@@ -764,10 +767,12 @@ class HealthCheckAPI {
 
       const fileDetails = [];
 
-      // Step 2: For each ID, get ContentDocumentId from ContentVersion
-      const versionIds = [pdfId, fileId].filter(id => id);
+      // Step 2: Build a map of file types to IDs to handle properly
+      const fileTypeMap = [];
+      if (pdfId) fileTypeMap.push({ type: 'PDF', id: pdfId });
+      if (fileId) fileTypeMap.push({ type: 'FILE', id: fileId });
 
-      if (versionIds.length === 0) {
+      if (fileTypeMap.length === 0) {
         return {
           status: 'warning',
           message: 'No valid file IDs to check',
@@ -775,9 +780,12 @@ class HealthCheckAPI {
         };
       }
 
+      // Get unique version IDs for the query
+      const uniqueVersionIds = [...new Set(fileTypeMap.map(f => f.id))];
+
       const versionQuery = `SELECT Id, ContentDocumentId, Title
                             FROM ContentVersion
-                            WHERE Id IN ('${versionIds.join("','")}')`;
+                            WHERE Id IN ('${uniqueVersionIds.join("','")}')`;
 
       const versionResult = await this.soqlQuery(versionQuery);
 
@@ -791,6 +799,12 @@ class HealthCheckAPI {
 
       console.log('[HealthCheckAPI] Found', versionResult.records.length, 'ContentVersion records');
 
+      // Create a map of version ID to version record
+      const versionMap = {};
+      versionResult.records.forEach(v => {
+        versionMap[v.Id] = v;
+      });
+
       // Step 3: For each ContentDocumentId, query ContentDocumentLink
       const documentIds = versionResult.records.map(v => v.ContentDocumentId);
 
@@ -802,23 +816,48 @@ class HealthCheckAPI {
 
       console.log('[HealthCheckAPI] Found', linkResult.totalSize, 'ContentDocumentLink records');
 
-      // Step 4: Organize results by file
-      versionResult.records.forEach(version => {
-        const fileType = version.Id === pdfId ? 'PDF' : 'FILE';
-        const links = linkResult.records.filter(link => link.ContentDocumentId === version.ContentDocumentId);
+      // Step 4: Get EntityDefinition mapping for key prefixes
+      const entityDefQuery = `SELECT KeyPrefix, Label FROM EntityDefinition WHERE KeyPrefix != null`;
+      const entityDefResult = await this.soqlQuery(entityDefQuery);
 
-        fileDetails.push({
-          type: fileType,
-          versionId: version.Id,
-          documentId: version.ContentDocumentId,
-          title: version.Title,
-          shareCount: links.length,
-          shares: links.map(link => ({
-            linkedEntityId: link.LinkedEntityId,
-            shareType: link.ShareType,
-            visibility: link.Visibility
-          }))
+      console.log('[HealthCheckAPI] Found', entityDefResult.totalSize, 'EntityDefinition records');
+
+      // Create a map of KeyPrefix to Label (case-sensitive)
+      const keyPrefixMap = {};
+      if (entityDefResult.records) {
+        entityDefResult.records.forEach(entity => {
+          if (entity.KeyPrefix) {
+            keyPrefixMap[entity.KeyPrefix] = entity.Label;
+          }
         });
+      }
+
+      // Step 5: Organize results by file - create separate entries for PDF and FILE
+      fileTypeMap.forEach(fileInfo => {
+        const version = versionMap[fileInfo.id];
+        if (version) {
+          const links = linkResult.records.filter(link => link.ContentDocumentId === version.ContentDocumentId);
+
+          fileDetails.push({
+            type: fileInfo.type,
+            versionId: version.Id,
+            documentId: version.ContentDocumentId,
+            title: version.Title,
+            shareCount: links.length,
+            shares: links.map(link => {
+              // Extract first 3 characters from LinkedEntityId as key prefix (case-sensitive)
+              const keyPrefix = link.LinkedEntityId ? link.LinkedEntityId.substring(0, 3) : '';
+              const objectName = keyPrefixMap[keyPrefix] || 'Unknown';
+
+              return {
+                linkedEntityId: link.LinkedEntityId,
+                objectName: objectName,
+                shareType: link.ShareType,
+                visibility: link.Visibility
+              };
+            })
+          });
+        }
       });
 
       // Step 5: Generate summary
@@ -831,6 +870,9 @@ class HealthCheckAPI {
       if (pdfFile && docFile) summary += ', ';
       if (docFile) summary += `FILE has ${docFile.shareCount} share(s)`;
 
+      // Step 6: Validate shares based on state
+      const validation = this.validateDocumentRevisionShares(fileDetails, stateName);
+
       return {
         status: 'success',
         message: 'Share check completed successfully',
@@ -838,8 +880,10 @@ class HealthCheckAPI {
         data: {
           revisionName: revision.Name,
           revisionId: recordId,
+          stateName: stateName,
           files: fileDetails,
-          totalShares: totalShares
+          totalShares: totalShares,
+          validation: validation
         }
       };
 
@@ -849,6 +893,256 @@ class HealthCheckAPI {
         status: 'error',
         message: error.message || 'Unknown error occurred',
         summary: `Error: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Validate document revision shares based on state
+   * @param {Array} fileDetails - Array of file details with shares
+   * @param {string} stateName - Name of the document state
+   * @returns {object} - Validation result
+   */
+  static validateDocumentRevisionShares(fileDetails, stateName) {
+    const issues = [];
+    const warnings = [];
+
+    // Normalize state name for comparison (case-insensitive, handle parentheses and spaces)
+    const normalizedState = stateName.toLowerCase().trim();
+
+    // Determine expected shares based on state
+    // Effective states: "Effective (Simple)" and "Effective"
+    const isEffective = normalizedState === 'effective' || normalizedState === 'effective (simple)';
+    // Superseded states: "Superseded (Simple)" and "Superseded"
+    const isSuperseded = normalizedState === 'superseded' || normalizedState === 'superseded (simple)';
+
+    if (!isEffective && !isSuperseded) {
+      warnings.push(`Unknown state: "${stateName}". Cannot validate sharing rules.`);
+      return { isValid: null, issues, warnings };
+    }
+
+    // Check each file for expected shares
+    fileDetails.forEach(file => {
+      const objectNames = file.shares.map(share => share.objectName);
+      const hasDocRevisionLogs = objectNames.includes('Document Revision Logs');
+      const hasMasterDocument = objectNames.includes('Master Document');
+
+      if (!hasDocRevisionLogs) {
+        issues.push(`${file.type}: Missing required share with "Document Revision Logs"`);
+      }
+
+      if (isEffective) {
+        // Effective state should have both Document Revision Logs and Master Document
+        if (!hasMasterDocument) {
+          issues.push(`${file.type}: Missing required share with "Master Document" (State: ${stateName})`);
+        }
+      } else if (isSuperseded) {
+        // Superseded state should have Document Revision Logs but NOT Master Document
+        if (hasMasterDocument) {
+          issues.push(`${file.type}: Should NOT have share with "Master Document" (State: ${stateName})`);
+        }
+      }
+    });
+
+    const isValid = issues.length === 0;
+    return { isValid, issues, warnings, stateName };
+  }
+
+  /**
+   * Add missing ContentDocumentLinks for Document Revision
+   * Finds the matching Revision Log record with the same version number and creates missing share links
+   * @param {string} recordId - CompSuite__Document_Revision__c record ID
+   * @returns {Promise<object>} - Result of the operation
+   */
+  static async addMissingDocumentRevisionLinks(recordId) {
+    console.log('[HealthCheckAPI] Adding missing document revision links for:', recordId);
+
+    try {
+      // Step 1: Get Document Revision details including Version
+      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_Id__c, CompSuite__File_Id__c,
+                             CompSuite__Version__c, CompSuite__State__r.Name
+                             FROM CompSuite__Document_Revision__c
+                             WHERE Id = '${recordId}'`;
+
+      const revisionResult = await this.soqlQuery(revisionQuery);
+
+      if (!revisionResult.records || revisionResult.records.length === 0) {
+        return {
+          status: 'error',
+          message: 'Document Revision record not found'
+        };
+      }
+
+      const revision = revisionResult.records[0];
+      const pdfId = revision.CompSuite__PDF_Id__c;
+      const fileId = revision.CompSuite__File_Id__c;
+      const versionNumber = revision.CompSuite__Version__c;
+      const stateName = revision.CompSuite__State__r?.Name || '';
+
+      console.log('[HealthCheckAPI] Document Revision:', revision.Name, 'Version:', versionNumber);
+
+      if (!pdfId && !fileId) {
+        return {
+          status: 'warning',
+          message: 'No file IDs found on this Document Revision'
+        };
+      }
+
+      if (!versionNumber) {
+        return {
+          status: 'error',
+          message: 'No version number found on Document Revision'
+        };
+      }
+
+      // Step 2: Find the matching Revision Log with the same version number
+      const revisionLogQuery = `SELECT Id, Name
+                                FROM CompSuite__Document_Revision_Logs__c
+                                WHERE CompSuite__Document_Revision__c = '${recordId}'
+                                  AND CompSuite__Version__c = '${versionNumber}'
+                                LIMIT 1`;
+
+      const revisionLogResult = await this.soqlQuery(revisionLogQuery);
+
+      if (!revisionLogResult.records || revisionLogResult.records.length === 0) {
+        return {
+          status: 'error',
+          message: `No Revision Log found with Version ${versionNumber} for this Document Revision`
+        };
+      }
+
+      const revisionLog = revisionLogResult.records[0];
+      const linkedEntityId = revisionLog.Id;
+
+      console.log('[HealthCheckAPI] Found matching Revision Log:', revisionLog.Name, '(', linkedEntityId, ')');
+
+      // Step 3: Get ContentDocumentIds from ContentVersion IDs
+      const fileTypeMap = [];
+      if (pdfId) fileTypeMap.push({ type: 'PDF', id: pdfId });
+      if (fileId) fileTypeMap.push({ type: 'FILE', id: fileId });
+
+      const uniqueVersionIds = [...new Set(fileTypeMap.map(f => f.id))];
+      const versionQuery = `SELECT Id, ContentDocumentId, Title
+                            FROM ContentVersion
+                            WHERE Id IN ('${uniqueVersionIds.join("','")}')`;
+
+      const versionResult = await this.soqlQuery(versionQuery);
+
+      if (!versionResult.records || versionResult.records.length === 0) {
+        return {
+          status: 'error',
+          message: 'ContentVersion records not found for the specified IDs'
+        };
+      }
+
+      // Create a map of version ID to ContentDocumentId
+      const versionMap = {};
+      versionResult.records.forEach(v => {
+        versionMap[v.Id] = { documentId: v.ContentDocumentId, title: v.Title };
+      });
+
+      // Step 4: Check which ContentDocumentLinks already exist
+      const documentIds = versionResult.records.map(v => v.ContentDocumentId);
+      const linkQuery = `SELECT Id, ContentDocumentId, LinkedEntityId
+                         FROM ContentDocumentLink
+                         WHERE ContentDocumentId IN ('${documentIds.join("','")}')
+                           AND LinkedEntityId = '${linkedEntityId}'`;
+
+      const linkResult = await this.soqlQuery(linkQuery);
+
+      // Create a set of existing links (documentId)
+      const existingLinks = new Set();
+      if (linkResult.records) {
+        linkResult.records.forEach(link => {
+          existingLinks.add(link.ContentDocumentId);
+        });
+      }
+
+      console.log('[HealthCheckAPI] Existing links:', existingLinks.size);
+
+      // Step 5: Create missing ContentDocumentLink records
+      const linksToCreate = [];
+      fileTypeMap.forEach(fileInfo => {
+        const versionInfo = versionMap[fileInfo.id];
+        if (versionInfo && !existingLinks.has(versionInfo.documentId)) {
+          linksToCreate.push({
+            type: fileInfo.type,
+            documentId: versionInfo.documentId,
+            title: versionInfo.title
+          });
+        }
+      });
+
+      if (linksToCreate.length === 0) {
+        return {
+          status: 'success',
+          message: 'All required ContentDocumentLinks already exist',
+          created: 0
+        };
+      }
+
+      console.log('[HealthCheckAPI] Creating', linksToCreate.length, 'missing links');
+
+      // Create ContentDocumentLink records using REST API
+      const session = await SessionManager.getCurrentSession();
+      const createdLinks = [];
+
+      for (const link of linksToCreate) {
+        const linkData = {
+          ContentDocumentId: link.documentId,
+          LinkedEntityId: linkedEntityId,
+          ShareType: 'V', // V = Viewer permission
+          Visibility: 'AllUsers' // AllUsers visibility
+        };
+
+        const createUrl = new URL('/services/data/v59.0/sobjects/ContentDocumentLink', session.instanceUrl);
+
+        try {
+          const response = await fetch(createUrl.toString(), {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + session.sessionId,
+              'Accept': 'application/json; charset=UTF-8',
+              'Content-Type': 'application/json; charset=UTF-8'
+            },
+            body: JSON.stringify(linkData)
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[HealthCheckAPI] Failed to create link for', link.type, ':', errorText);
+            throw new Error(`Failed to create link for ${link.type}: ${errorText}`);
+          }
+
+          const result = await response.json();
+          createdLinks.push({
+            type: link.type,
+            title: link.title,
+            documentId: link.documentId,
+            linkId: result.id
+          });
+
+          console.log('[HealthCheckAPI] Created ContentDocumentLink:', result.id, 'for', link.type);
+        } catch (error) {
+          console.error('[HealthCheckAPI] Error creating link:', error);
+          throw error;
+        }
+      }
+
+      return {
+        status: 'success',
+        message: `Successfully created ${createdLinks.length} ContentDocumentLink(s)`,
+        created: createdLinks.length,
+        links: createdLinks,
+        revisionLogId: linkedEntityId,
+        revisionLogName: revisionLog.Name
+      };
+
+    } catch (error) {
+      console.error('[HealthCheckAPI] Error adding missing links:', error);
+      return {
+        status: 'error',
+        message: error.message || 'Unknown error occurred'
       };
     }
   }

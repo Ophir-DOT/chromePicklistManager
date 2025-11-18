@@ -1,5 +1,5 @@
 /**
- * Salesforce Picklist Manager - Pop-up Styles
+ * DOT Toolkit - Pop-up Styles
  * Version 1.3.0 - Dot Compliance Design System
  *
  * Design based on Dot Compliance Brand Book (2025)
@@ -26,7 +26,7 @@ body {
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   color: var(--brand-color-text-dark);
-  width: 400px;
+  width: 600px;
   min-height: 500px;
   background: var(--brand-color-neutral-light);
 }
@@ -910,4 +910,213 @@ footer {
 
 .object-list::-webkit-scrollbar-thumb:hover {
   background: var(--brand-color-secondary);
+}
+
+/* ============================================
+   SHARE FILES TABLE
+   ============================================ */
+
+.share-files-info {
+  padding: var(--spacing-md);
+  background: var(--brand-color-neutral-light);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-md);
+  border-left: var(--border-width-thick) solid var(--brand-color-cta);
+}
+
+.share-files-info h3 {
+  font-family: var(--font-family-headline);
+  font-size: var(--font-size-md);
+  color: var(--brand-color-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.share-files-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+}
+
+.share-files-info .info-row strong {
+  color: var(--brand-color-primary);
+}
+
+.share-files-table {
+  margin-top: var(--spacing-md);
+}
+
+.file-section {
+  margin-bottom: var(--spacing-lg);
+  border: var(--border-width-thin) solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.file-header {
+  background: var(--brand-color-primary);
+  color: var(--brand-color-text-light);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-family-headline);
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-type-badge {
+  background: var(--brand-color-cta);
+  color: var(--brand-color-text-light);
+  padding: 2px 8px;
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.file-info {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--brand-color-neutral-light);
+  border-bottom: var(--border-width-thin) solid var(--brand-color-neutral-med);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-xs);
+  color: var(--brand-color-neutral-med);
+}
+
+.shares-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.shares-table thead {
+  background: var(--brand-color-secondary);
+  color: var(--brand-color-text-light);
+}
+
+.shares-table th {
+  padding: var(--spacing-sm);
+  text-align: left;
+  font-family: var(--font-family-headline);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  border-bottom: var(--border-width-medium) solid var(--brand-color-cta);
+}
+
+.shares-table td {
+  padding: var(--spacing-sm);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-xs);
+  color: var(--brand-color-text-dark);
+  border-bottom: var(--border-width-thin) solid var(--brand-color-neutral-light);
+  word-break: break-word;
+}
+
+.shares-table tbody tr:hover {
+  background: var(--brand-color-link-bg);
+}
+
+.shares-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.entity-link {
+  color: var(--brand-color-cta);
+  text-decoration: none;
+  font-family: var(--font-family-mono);
+  font-weight: var(--font-weight-bold);
+  transition: all var(--transition-base);
+}
+
+.entity-link:hover {
+  color: var(--brand-color-primary);
+  text-decoration: underline;
+}
+
+.object-name-badge {
+  color: var(--brand-color-text-dark);
+  font-size: var(--font-size-xs);
+}
+
+.share-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  background: var(--brand-color-neutral-light);
+  color: var(--brand-color-primary);
+}
+
+.visibility-badge {
+  color: var(--brand-color-text-dark);
+  font-size: var(--font-size-xs);
+}
+
+.no-shares-message {
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--brand-color-neutral-med);
+  font-family: var(--font-family-body);
+  font-style: italic;
+}
+
+/* ============================================
+   VALIDATION MESSAGES
+   ============================================ */
+
+.validation-success,
+.validation-error,
+.validation-warning {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.validation-success {
+  background: var(--color-success-bg);
+  border: var(--border-width-thin) solid var(--color-success);
+  color: var(--color-success-text);
+}
+
+.validation-error {
+  background: var(--color-error-bg);
+  border: var(--border-width-thin) solid var(--color-error);
+  color: var(--color-error-text);
+}
+
+.validation-warning {
+  background: var(--color-warning-bg);
+  border: var(--border-width-thin) solid var(--color-warning);
+  color: var(--color-warning-text);
+}
+
+.validation-success .icon,
+.validation-error .icon,
+.validation-warning .icon {
+  flex-shrink: 0;
+  font-size: var(--font-size-lg);
+}
+
+.validation-success > div,
+.validation-error > div,
+.validation-warning > div {
+  flex: 1;
+}
+
+.validation-error ul,
+.validation-warning ul {
+  margin: var(--spacing-xs) 0 0 var(--spacing-md);
+  padding: 0;
+}
+
+.validation-error li,
+.validation-warning li {
+  margin: 4px 0;
+  list-style-type: disc;
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Salesforce Picklist Manager",
+  "name": "DOT Toolkit",
   "version": "1.3.0",
-  "description": "Export, compare, and deploy picklist values and dependencies across Salesforce orgs",
+  "description": "Comprehensive toolkit for Salesforce: manage picklists, dependencies, health checks, and document sharing",
 
   "permissions": [
     "cookies",
