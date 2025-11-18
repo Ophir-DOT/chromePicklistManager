@@ -1,55 +1,132 @@
-/* Settings Page Styles */
+/**
+ * Settings Page Styles
+ * Version 1.3.0 - Dot Compliance Design System
+ *
+ * Design based on Dot Compliance Brand Book (2025)
+ */
+
+/* ============================================
+   GLOBAL RESET & BASE STYLES
+   ============================================ */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-  padding: 20px;
-  color: #333;
+:root {
+  /* Dot Compliance Colors */
+  --brand-color-primary: #270648;
+  --brand-color-secondary: #7D32C7;
+  --brand-color-cta: #DD0087;
+  --brand-color-link-bg: #FFE1FB;
+  --brand-color-neutral-med: #ABA1B5;
+  --brand-color-neutral-light: #F5F3FB;
+  --brand-color-text-dark: #270646;
+  --brand-color-text-light: #FFFFFF;
+
+  /* Accent Colors */
+  --brand-color-accent-green: #5EDBBB;
+
+  /* Semantic Colors */
+  --color-success: #5EDBBB;
+  --color-success-bg: #e8f7ed;
+  --color-success-text: #2d6e45;
+  --color-error: #c23934;
+  --color-error-bg: #fde8e8;
+  --color-error-text: #8b2723;
+  --color-info: #54C3F4;
+  --color-warning: #FFBB60;
+
+  /* Typography */
+  --font-family-headline: 'Quicksand', 'Helvetica Neue', sans-serif;
+  --font-family-body: 'PT Serif', Georgia, serif;
+  --font-family-mono: 'Courier New', monospace;
+
+  /* Spacing */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 2.5rem;
+
+  /* Border Radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(39, 6, 72, 0.1);
+  --shadow-md: 0 2px 8px rgba(39, 6, 72, 0.12);
+  --shadow-lg: 0 4px 16px rgba(39, 6, 72, 0.15);
+  --shadow-xl: 0 10px 40px rgba(39, 6, 72, 0.2);
+
+  /* Transitions */
+  --transition-base: 0.2s ease;
 }
+
+body {
+  font-family: var(--font-family-body);
+  background: linear-gradient(135deg, var(--brand-color-secondary) 0%, var(--brand-color-primary) 100%);
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  color: var(--brand-color-text-dark);
+  line-height: 1.6;
+}
+
+/* ============================================
+   CONTAINER
+   ============================================ */
 
 .container {
   max-width: 900px;
   margin: 0 auto;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  padding: 30px;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--spacing-xl);
 }
 
+/* ============================================
+   HEADER
+   ============================================ */
+
 header {
-  margin-bottom: 30px;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 20px;
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--brand-color-neutral-light);
+  padding-bottom: var(--spacing-lg);
 }
 
 header h1 {
-  font-size: 28px;
-  color: #2d3748;
-  margin-bottom: 8px;
+  font-family: var(--font-family-headline);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--brand-color-primary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .subtitle {
-  color: #718096;
-  font-size: 14px;
+  font-family: var(--font-family-body);
+  color: var(--brand-color-neutral-med);
+  font-size: 0.875rem;
 }
 
-/* Update Section */
+/* ============================================
+   UPDATE SECTION
+   ============================================ */
+
 .update-section {
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
+  background: var(--brand-color-neutral-light);
+  border: 2px solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--spacing-md);
 }
 
 .update-info {
@@ -57,35 +134,39 @@ header h1 {
 }
 
 .version-info {
-  font-size: 14px;
-  color: #2d3748;
-  margin-bottom: 8px;
+  font-family: var(--font-family-headline);
+  font-size: 0.875rem;
+  color: var(--brand-color-primary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .version-info strong {
-  margin-right: 8px;
+  font-weight: 700;
+  margin-right: var(--spacing-xs);
 }
 
 .update-status {
-  font-size: 13px;
-  color: #718096;
+  font-family: var(--font-family-body);
+  font-size: 0.8125rem;
+  color: var(--brand-color-neutral-med);
 }
 
 .update-status.checking {
-  color: #3182ce;
+  color: var(--color-info);
 }
 
 .update-status.up-to-date {
-  color: #38a169;
+  color: var(--color-success);
   font-weight: 500;
 }
 
 .update-status.update-available {
-  color: #dd6b20;
+  color: var(--color-warning);
   font-weight: 500;
 }
 
-.update-status svg {
+.update-status svg,
+.update-status .material-symbols-rounded {
   display: inline-block;
   vertical-align: middle;
   margin-right: 4px;
@@ -97,49 +178,70 @@ header h1 {
   to { transform: rotate(360deg); }
 }
 
+/* ============================================
+   ACTIONS
+   ============================================ */
+
 .actions {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-lg);
 }
 
+/* ============================================
+   BUTTONS
+   ============================================ */
+
 .btn {
-  padding: 10px 20px;
+  padding: var(--spacing-sm) var(--spacing-lg);
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-headline);
+  font-size: 0.875rem;
+  font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
+  gap: var(--spacing-xs);
+  transition: all var(--transition-base);
 }
 
 .btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
+}
+
+.btn .material-symbols-rounded {
+  font-size: 16px;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--brand-color-cta);
+  color: var(--brand-color-text-light);
+}
+
+.btn-primary:hover {
+  background: #C20077;
+  box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
-  background: #e2e8f0;
-  color: #4a5568;
+  background: var(--brand-color-neutral-light);
+  color: var(--brand-color-primary);
+  border: 1px solid var(--brand-color-neutral-med);
 }
 
 .btn-secondary:hover {
-  background: #cbd5e0;
+  background: var(--brand-color-link-bg);
+  border-color: var(--brand-color-cta);
+  color: var(--brand-color-cta);
 }
 
 .btn-danger {
-  background: #fc8181;
-  color: white;
+  background: var(--color-error);
+  color: var(--brand-color-text-light);
 }
 
 .btn-danger:hover {
-  background: #f56565;
+  background: #a52a26;
 }
 
 .btn-close {
@@ -147,34 +249,43 @@ header h1 {
   border: none;
   cursor: pointer;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--border-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: background var(--transition-base);
+  color: var(--brand-color-neutral-med);
 }
 
 .btn-close:hover {
-  background: #f0f0f0;
+  background: var(--brand-color-neutral-light);
+  color: var(--brand-color-cta);
 }
 
-/* Checks List */
+.btn-close .material-symbols-rounded {
+  font-size: 20px;
+}
+
+/* ============================================
+   CHECKS LIST
+   ============================================ */
+
 .checks-list {
   display: grid;
-  gap: 16px;
+  gap: var(--spacing-md);
 }
 
 .check-item {
-  background: #f7fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  transition: all 0.2s;
+  background: var(--brand-color-neutral-light);
+  border: 2px solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  transition: all var(--transition-base);
 }
 
 .check-item:hover {
-  border-color: #cbd5e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-color: var(--brand-color-cta);
+  box-shadow: var(--shadow-sm);
 }
 
 .check-item.disabled {
@@ -185,40 +296,42 @@ header h1 {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .check-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3748;
+  font-family: var(--font-family-headline);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-color-primary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-xs);
 }
 
 .check-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px var(--spacing-xs);
   border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--font-family-headline);
+  font-size: 0.6875rem;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 .check-badge.enabled {
-  background: #c6f6d5;
-  color: #22543d;
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
 }
 
 .check-badge.disabled {
-  background: #fed7d7;
-  color: #742a2a;
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
 }
 
 .check-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-xs);
 }
 
 .btn-icon {
@@ -226,40 +339,47 @@ header h1 {
   border: none;
   background: none;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--border-radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all var(--transition-base);
+  color: var(--brand-color-neutral-med);
 }
 
 .btn-icon:hover {
-  background: #e2e8f0;
+  background: var(--brand-color-link-bg);
+  color: var(--brand-color-cta);
 }
 
 .btn-icon.delete:hover {
-  background: #fed7d7;
-  color: #c53030;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.btn-icon .material-symbols-rounded {
+  font-size: 20px;
 }
 
 .check-query {
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  padding: 12px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: #4a5568;
-  margin-bottom: 12px;
+  border: 1px solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: 0.8125rem;
+  color: var(--brand-color-text-dark);
+  margin-bottom: var(--spacing-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .check-meta {
   display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: #718096;
+  gap: var(--spacing-md);
+  font-family: var(--font-family-body);
+  font-size: 0.8125rem;
+  color: var(--brand-color-neutral-med);
 }
 
 .check-meta-item {
@@ -269,27 +389,45 @@ header h1 {
 }
 
 .check-meta-label {
-  font-weight: 600;
+  font-family: var(--font-family-headline);
+  font-weight: 700;
+  color: var(--brand-color-primary);
 }
 
-/* Empty State */
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-  color: #a0aec0;
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  color: var(--brand-color-neutral-med);
+}
+
+.empty-state .empty-icon {
+  font-size: 64px;
+  opacity: 0.3;
+  color: var(--brand-color-neutral-med);
 }
 
 .empty-state p {
-  margin-top: 16px;
-  font-size: 16px;
+  font-family: var(--font-family-headline);
+  margin-top: var(--spacing-md);
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 .empty-state .hint {
-  font-size: 14px;
-  color: #cbd5e0;
+  font-family: var(--font-family-body);
+  font-size: 0.875rem;
+  color: var(--brand-color-neutral-med);
+  opacity: 0.8;
 }
 
-/* Modal */
+/* ============================================
+   MODAL
+   ============================================ */
+
 .modal {
   display: none;
   position: fixed;
@@ -297,11 +435,11 @@ header h1 {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(39, 6, 72, 0.5);
   z-index: 1000;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--spacing-lg);
 }
 
 .modal.active {
@@ -310,111 +448,136 @@ header h1 {
 
 .modal-content {
   background: white;
-  border-radius: 12px;
+  border-radius: var(--border-radius-lg);
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(39, 6, 72, 0.3);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 2px solid #f0f0f0;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 2px solid var(--brand-color-neutral-light);
 }
 
 .modal-header h2 {
-  font-size: 20px;
-  color: #2d3748;
+  font-family: var(--font-family-headline);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--brand-color-primary);
 }
 
-/* Form Styles */
+/* ============================================
+   FORM STYLES
+   ============================================ */
+
 #checkForm {
-  padding: 24px;
+  padding: var(--spacing-xl);
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-lg);
 }
 
 .form-group label {
   display: block;
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 8px;
-  font-size: 14px;
+  font-family: var(--font-family-headline);
+  font-weight: 700;
+  color: var(--brand-color-primary);
+  margin-bottom: var(--spacing-xs);
+  font-size: 0.875rem;
 }
 
 .form-group input[type="text"],
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
-  border: 2px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  transition: border-color 0.2s;
+  padding: var(--spacing-sm);
+  border: 2px solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-body);
+  font-size: 0.875rem;
+  transition: all var(--transition-base);
 }
 
 .form-group input[type="text"]:focus,
 .form-group textarea:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--brand-color-cta);
+  box-shadow: 0 0 0 2px var(--brand-color-link-bg);
 }
 
 .form-group textarea {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-family-mono);
   resize: vertical;
 }
 
 .form-hint {
   display: block;
-  font-size: 12px;
-  color: #a0aec0;
+  font-family: var(--font-family-body);
+  font-size: 0.75rem;
+  color: var(--brand-color-neutral-med);
   margin-top: 6px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-xs);
   cursor: pointer;
+  font-family: var(--font-family-headline);
   font-weight: 500;
-  color: #2d3748;
+  color: var(--brand-color-primary);
 }
 
 .checkbox-label input[type="checkbox"] {
   width: 18px;
   height: 18px;
   cursor: pointer;
+  accent-color: var(--brand-color-cta);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 2px solid #f0f0f0;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 2px solid var(--brand-color-neutral-light);
 }
 
-/* Responsive */
+/* ============================================
+   MATERIAL SYMBOLS
+   ============================================ */
+
+.material-symbols-rounded {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
 @media (max-width: 768px) {
   body {
-    padding: 10px;
+    padding: var(--spacing-sm);
   }
 
   .container {
-    padding: 20px;
+    padding: var(--spacing-lg);
   }
 
   header h1 {
-    font-size: 24px;
+    font-size: 1.5rem;
   }
 
   .modal-content {
@@ -423,10 +586,15 @@ header h1 {
 
   .check-header {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--spacing-sm);
   }
 
   .check-actions {
     align-self: flex-start;
+  }
+
+  .update-section {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
