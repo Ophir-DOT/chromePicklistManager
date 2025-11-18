@@ -3,6 +3,7 @@ import SalesforceAPI from '../background/api-client.js';
 import MetadataAPI from '../background/metadata-api.js';
 import ToolingAPI from '../background/tooling-api.js';
 import SessionManager from '../background/session-manager.js';
+import HealthCheckAPI from '../background/health-check-api.js';
 
 // Global state
 let allObjects = [];
@@ -13,6 +14,7 @@ let filteredObjects = [];
 let allDepsObjects = [];
 let selectedDepsObject = null;
 let filteredDepsObjects = [];
+let parsedDepsData = null; // For import
 
 // Update Picklist view state
 let updateObjects = [];
@@ -78,8 +80,11 @@ function setupEventListeners() {
   // Main menu buttons
   document.getElementById('exportBtn').addEventListener('click', showExportView);
   document.getElementById('exportDepsBtn').addEventListener('click', showExportDepsView);
+  document.getElementById('picklistLoaderBtn').addEventListener('click', showPicklistLoader);
+  document.getElementById('dependencyLoaderBtn').addEventListener('click', showDependencyLoader);
   document.getElementById('compareBtn').addEventListener('click', handleCompare);
-  document.getElementById('deployBtn').addEventListener('click', handleDeploy);
+  document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
+  document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
   // Export view buttons
   document.getElementById('backBtn').addEventListener('click', showMainView);
@@ -92,6 +97,12 @@ function setupEventListeners() {
   document.getElementById('backFromDepsBtn').addEventListener('click', showMainView);
   document.getElementById('doExportDepsBtn').addEventListener('click', doExportDeps);
   document.getElementById('depsObjectSearch').addEventListener('input', handleDepsSearch);
+
+  // Dependency Loader view buttons
+  document.getElementById('backFromDependencyLoaderBtn').addEventListener('click', showMainView);
+  document.getElementById('depsFileInput').addEventListener('change', handleDepsFileUpload);
+  document.getElementById('importDepsBtn').addEventListener('click', previewDepsImport);
+  document.getElementById('deployDepsBtn').addEventListener('click', deployDepsImport);
 
   // Update Picklist view buttons
   document.getElementById('backFromUpdateBtn').addEventListener('click', showMainView);
@@ -113,6 +124,7 @@ async function showExportView() {
 function showMainView() {
   document.getElementById('exportView').classList.add('hidden');
   document.getElementById('exportDepsView').classList.add('hidden');
+  document.getElementById('dependencyLoaderView').classList.add('hidden');
   document.getElementById('updatePicklistView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
 
@@ -429,10 +441,24 @@ async function handleCompare() {
   alert('Compare functionality: Upload two exports to compare them.\n\nFor full compare features, use the sidepanel interface.');
 }
 
-async function handleDeploy() {
+async function showPicklistLoader() {
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('updatePicklistView').classList.remove('hidden');
   await loadUpdateObjects();
+}
+
+async function showDependencyLoader() {
+  document.getElementById('mainView').classList.add('hidden');
+  document.getElementById('dependencyLoaderView').classList.remove('hidden');
+
+  // Reset dependency loader state
+  parsedDepsData = null;
+  document.getElementById('depsFileInput').value = '';
+  document.getElementById('replaceDepsMode').checked = false;
+  document.getElementById('importDepsBtn').disabled = true;
+  document.getElementById('importDepsPreview').classList.add('hidden');
+  document.getElementById('importDepsStatus').textContent = '';
+  document.getElementById('importDepsStatus').className = 'status-message';
 }
 
 // ============================================================================
@@ -728,6 +754,420 @@ function downloadDependenciesCSV(exportData, filename) {
   URL.revokeObjectURL(url);
 
   console.log('[Popup] Dependencies CSV downloaded:', filename, 'Rows:', rows.length);
+}
+
+// ============================================================================
+// IMPORT DEPENDENCIES
+// ============================================================================
+
+async function handleDepsFileUpload(e) {
+  const file = e.target.files[0];
+  const importBtn = document.getElementById('importDepsBtn');
+  const statusEl = document.getElementById('importDepsStatus');
+  const previewEl = document.getElementById('importDepsPreview');
+
+  if (!file) {
+    importBtn.disabled = true;
+    previewEl.classList.add('hidden');
+    return;
+  }
+
+  try {
+    statusEl.textContent = 'Parsing CSV file...';
+    statusEl.className = 'status-message loading';
+
+    console.log('[Popup] Parsing dependencies CSV file:', file.name);
+
+    const csvText = await file.text();
+    const parsed = parseDependenciesCSV(csvText);
+
+    console.log('[Popup] Parsed dependencies data:', parsed);
+
+    parsedDepsData = parsed;
+    importBtn.disabled = false;
+    statusEl.textContent = `✓ File loaded: ${parsed.totalRows} rows parsed`;
+    statusEl.className = 'status-message success';
+
+  } catch (error) {
+    console.error('[Popup] Error parsing CSV:', error);
+    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.className = 'status-message error';
+    importBtn.disabled = true;
+    parsedDepsData = null;
+  }
+}
+
+function parseDependenciesCSV(csvText) {
+  const lines = csvText.split('\n').filter(line => line.trim());
+
+  if (lines.length < 2) {
+    throw new Error('CSV file is empty or has no data rows');
+  }
+
+  // Parse header
+  const header = parseCSVLine(lines[0]);
+  console.log('[Popup] CSV Header:', header);
+
+  // Validate expected columns
+  const expectedColumns = ['Object API Name', 'Type', 'Record Type', 'Picklist Field',
+                          'Dependent Field', 'Controlling Field', 'Controlling Value', 'Dependent Value'];
+
+  // Map to organize data by object and type
+  const objectData = {};
+
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCSVLine(lines[i]);
+
+    if (cells.length < 3) continue; // Skip empty lines
+
+    const [objectName, type, recordType, picklistField, dependentField,
+           controllingField, controllingValue, dependentValue] = cells;
+
+    if (!objectData[objectName]) {
+      objectData[objectName] = {
+        fieldDependencies: [],
+        recordTypePicklists: []
+      };
+    }
+
+    if (type === 'Field Dependency' && dependentField && controllingField) {
+      // Find existing dependency or create new
+      let dep = objectData[objectName].fieldDependencies.find(
+        d => d.dependentField === dependentField && d.controllingField === controllingField
+      );
+
+      if (!dep) {
+        dep = {
+          dependentField,
+          controllingField,
+          mappings: []
+        };
+        objectData[objectName].fieldDependencies.push(dep);
+      }
+
+      if (controllingValue && dependentValue) {
+        dep.mappings.push({
+          controllingValue,
+          dependentValue
+        });
+      }
+    } else if (type === 'Record Type Picklist' && recordType && picklistField && dependentValue) {
+      // Find existing record type or create new
+      let rt = objectData[objectName].recordTypePicklists.find(r => r.recordType === recordType);
+
+      if (!rt) {
+        rt = {
+          recordType,
+          picklistValues: []
+        };
+        objectData[objectName].recordTypePicklists.push(rt);
+      }
+
+      // Find existing picklist or create new
+      let pv = rt.picklistValues.find(p => p.picklist === picklistField);
+
+      if (!pv) {
+        pv = {
+          picklist: picklistField,
+          values: []
+        };
+        rt.picklistValues.push(pv);
+      }
+
+      if (dependentValue && dependentValue !== '(No values)') {
+        pv.values.push(dependentValue);
+      }
+    }
+  }
+
+  return {
+    objectData,
+    totalRows: lines.length - 1
+  };
+}
+
+function parseCSVLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+async function previewDepsImport() {
+  if (!parsedDepsData) return;
+
+  const previewEl = document.getElementById('importDepsPreview');
+  const contentEl = document.getElementById('importDepsPreviewContent');
+  const statusEl = document.getElementById('importDepsStatus');
+  const replaceMode = document.getElementById('replaceDepsMode').checked;
+
+  try {
+    statusEl.textContent = 'Loading preview...';
+    statusEl.className = 'status-message loading';
+
+    let html = '<div class="preview-summary">';
+
+    // Show mode
+    const modeLabel = replaceMode
+      ? '<span style="color: #c23934; font-weight: bold;">Replace Mode</span>'
+      : '<span style="color: #0176d3; font-weight: bold;">Append Mode</span>';
+    html += `<p style="margin-bottom: 12px;">Mode: ${modeLabel}</p>`;
+
+    for (const [objectName, data] of Object.entries(parsedDepsData.objectData)) {
+      html += `<div class="preview-object"><strong>${objectName}</strong><ul>`;
+
+      if (data.fieldDependencies.length > 0) {
+        html += `<li><strong>Field Dependencies:</strong> ${data.fieldDependencies.length} field(s)</li>`;
+        for (const dep of data.fieldDependencies) {
+          html += `<ul><li>${dep.dependentField} → ${dep.controllingField} (${dep.mappings.length} mappings)</li></ul>`;
+        }
+      }
+
+      if (data.recordTypePicklists.length > 0) {
+        html += `<li><strong>Record Type Picklists:</strong> ${data.recordTypePicklists.length} record type(s)</li>`;
+        for (const rt of data.recordTypePicklists) {
+          html += `<ul><li>${rt.recordType} (${rt.picklistValues.length} picklist(s))</li></ul>`;
+        }
+      }
+
+      html += '</ul></div>';
+    }
+
+    html += '</div>';
+
+    // Show mode-specific warning
+    if (replaceMode) {
+      html += '<p class="warning-text">⚠️ Replace Mode: Only CSV dependencies will exist. All other existing dependencies will be REMOVED.</p>';
+    } else {
+      html += '<p class="warning-text">⚠️ Append Mode: CSV dependencies will be added to existing dependencies. No dependencies will be removed.</p>';
+    }
+
+    contentEl.innerHTML = html;
+    previewEl.classList.remove('hidden');
+
+    statusEl.textContent = '✓ Preview ready. Review changes and click "Download Package & Deploy" when ready.';
+    statusEl.className = 'status-message success';
+
+  } catch (error) {
+    console.error('[Popup] Error generating preview:', error);
+    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.className = 'status-message error';
+  }
+}
+
+async function deployDepsImport() {
+  if (!parsedDepsData) return;
+
+  const deployBtn = document.getElementById('deployDepsBtn');
+  const statusEl = document.getElementById('importDepsStatus');
+  const replaceMode = document.getElementById('replaceDepsMode').checked;
+
+  try {
+    deployBtn.disabled = true;
+    statusEl.textContent = 'Building deployment package...';
+    statusEl.className = 'status-message loading';
+
+    console.log('[Popup] Starting deployment of dependencies... Replace mode:', replaceMode);
+
+    // Get current session
+    const session = await SessionManager.getCurrentSession();
+
+    // Build metadata structure for deployment
+    const metadataChanges = {};
+
+    for (const [objectName, data] of Object.entries(parsedDepsData.objectData)) {
+      console.log(`[Popup] Processing ${objectName}...`);
+
+      // Read current metadata for this object
+      const currentMetadata = await MetadataAPI.readObject(session, objectName);
+
+      // Build fields with dependencies
+      if (data.fieldDependencies.length > 0) {
+        if (!metadataChanges[objectName]) {
+          metadataChanges[objectName] = {};
+        }
+
+        for (const dep of data.fieldDependencies) {
+          // Find the field in current metadata
+          const fieldMeta = currentMetadata.fields.find(f => f.fullName === dep.dependentField);
+
+          if (!fieldMeta) {
+            console.warn(`[Popup] Field ${dep.dependentField} not found in ${objectName}`);
+            continue;
+          }
+
+          // Determine value settings based on mode
+          let valueSettings;
+          if (replaceMode) {
+            // Replace mode: only use CSV mappings
+            valueSettings = dep.mappings.map(m => ({
+              controllingFieldValue: m.controllingValue,
+              valueName: m.dependentValue
+            }));
+            console.log(`[Popup] Replace mode: Using ${valueSettings.length} mappings from CSV for ${dep.dependentField}`);
+          } else {
+            // Append mode: merge existing + CSV mappings
+            const existingSettings = fieldMeta.valueSet?.valueSettings || [];
+            const newMappings = dep.mappings.map(m => ({
+              controllingFieldValue: m.controllingValue,
+              valueName: m.dependentValue
+            }));
+
+            // Merge and deduplicate based on controllingFieldValue + valueName
+            const merged = [...existingSettings];
+            for (const newMapping of newMappings) {
+              const exists = merged.some(m =>
+                m.controllingFieldValue === newMapping.controllingFieldValue &&
+                m.valueName === newMapping.valueName
+              );
+              if (!exists) {
+                merged.push(newMapping);
+              }
+            }
+            valueSettings = merged;
+            console.log(`[Popup] Append mode: Merged ${existingSettings.length} existing + ${newMappings.length} new = ${valueSettings.length} total mappings for ${dep.dependentField}`);
+          }
+
+          // Keep ALL existing picklist values - we're only updating dependencies, not the values themselves
+          const values = fieldMeta.valueSet?.valueSetDefinition?.value || [];
+
+          console.log(`[Popup] Keeping all ${values.length} existing picklist values (only updating dependency mappings)`);
+
+          // Verify that all values referenced in dependencies exist
+          if (replaceMode) {
+            const referencedValueNames = new Set(valueSettings.map(vs => vs.valueName));
+            const existingValueNames = new Set(values.map(v => v.fullName));
+            const missingValues = [...referencedValueNames].filter(v => !existingValueNames.has(v));
+
+            if (missingValues.length > 0) {
+              console.warn(`[Popup] Warning: The following values are referenced in dependencies but don't exist in the picklist: ${missingValues.join(', ')}`);
+              statusEl.textContent += `\n⚠️ Warning: Some dependency values don't exist in the picklist: ${missingValues.join(', ')}`;
+            }
+          }
+
+          // Build field with dependencies
+          metadataChanges[objectName][dep.dependentField] = {
+            label: fieldMeta.label,
+            type: fieldMeta.type || 'Picklist',
+            controllingField: dep.controllingField,
+            valueSettings: valueSettings,
+            values: values
+          };
+        }
+      }
+
+      // Note: Record Type Picklist updates would require extending MetadataAPI
+      // to handle record type metadata separately - this is more complex
+      if (data.recordTypePicklists.length > 0) {
+        console.warn('[Popup] Record type picklist updates not yet implemented');
+        statusEl.textContent = '⚠️ Warning: Record type picklist updates are not yet supported. Only field dependencies will be deployed.';
+      }
+    }
+
+    console.log('[Popup] Metadata changes prepared:', metadataChanges);
+
+    // Download package for review
+    statusEl.textContent = 'Generating deployment package...';
+    const zipBlob = await MetadataAPI.buildDeployPackageBlob(metadataChanges);
+
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dependencies-deployment-${Date.now()}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = '📦 Package downloaded! Review the package, then confirm to deploy...';
+    statusEl.className = 'status-message';
+
+    // Confirm deployment
+    const confirmed = confirm('Package downloaded. Would you like to deploy it now?');
+
+    if (!confirmed) {
+      statusEl.textContent = 'Deployment cancelled.';
+      statusEl.className = 'status-message';
+      deployBtn.disabled = false;
+      return;
+    }
+
+    // Deploy
+    statusEl.textContent = 'Deploying to Salesforce...';
+    statusEl.className = 'status-message loading';
+
+    const deployId = await MetadataAPI.deploy(session, metadataChanges);
+    console.log('[Popup] Deployment started:', deployId);
+
+    // Poll for status
+    let done = false;
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    while (!done && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const status = await MetadataAPI.checkDeployStatus(session, deployId);
+      console.log('[Popup] Deploy status:', status);
+
+      statusEl.textContent = `Deploying... (${status.numberComponentsDeployed}/${status.numberComponentsTotal} components)`;
+
+      done = status.done;
+
+      if (done) {
+        if (status.success) {
+          statusEl.textContent = `✓ Deployment successful! ${status.numberComponentsDeployed} components deployed.`;
+          statusEl.className = 'status-message success';
+
+          // Reset after success
+          setTimeout(() => {
+            document.getElementById('depsFileInput').value = '';
+            document.getElementById('importDepsPreview').classList.add('hidden');
+            parsedDepsData = null;
+            statusEl.textContent = '';
+            statusEl.className = 'status-message';
+          }, 3000);
+
+        } else {
+          statusEl.textContent = `✗ Deployment failed: ${status.errorMessage || 'Unknown error'}`;
+          statusEl.className = 'status-message error';
+        }
+      }
+
+      attempts++;
+    }
+
+    if (!done) {
+      statusEl.textContent = '⚠️ Deployment timeout. Check Salesforce deployment status.';
+      statusEl.className = 'status-message error';
+    }
+
+  } catch (error) {
+    console.error('[Popup] Deployment failed:', error);
+    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.className = 'status-message error';
+  } finally {
+    deployBtn.disabled = false;
+  }
 }
 
 // ============================================================================
@@ -1294,6 +1734,567 @@ function resetUpdatePicklistView() {
   document.getElementById('previewArea').classList.add('hidden');
   document.getElementById('updatePicklistStatus').textContent = '';
   document.getElementById('updatePicklistStatus').className = 'status-message';
+}
+
+// ============================================================================
+// DOT HEALTH CHECK
+// ============================================================================
+
+async function handleHealthCheck() {
+  try {
+    console.log('[Popup] Starting DOT Health Check...');
+
+    // Show loading indicator (reuse existing status or create temp overlay)
+    const loadingMessage = 'Running health checks...';
+
+    // Create a simple loading overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    overlay.innerHTML = '<div style="background: white; padding: 30px; border-radius: 8px; text-align: center;"><div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Running DOT Health Check</div><div style="color: #666;">Please wait...</div></div>';
+    document.body.appendChild(overlay);
+
+    // Run all health checks
+    const results = await HealthCheckAPI.runAllHealthChecks();
+
+    console.log('[Popup] Health check results:', results);
+
+    // Remove loading overlay
+    document.body.removeChild(overlay);
+
+    // Generate and open HTML report
+    generateHealthCheckReport(results);
+
+  } catch (error) {
+    console.error('[Popup] Health check failed:', error);
+    alert(`Health check failed: ${error.message}`);
+  }
+}
+
+function generateHealthCheckReport(results) {
+  // Generate HTML report content
+  const reportHTML = buildHealthCheckHTML(results);
+
+  // Open in new tab
+  const blob = new Blob([reportHTML], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+
+  chrome.tabs.create({ url: url }, (tab) => {
+    console.log('[Popup] Health check report opened in new tab:', tab.id);
+  });
+}
+
+function buildHealthCheckHTML(results) {
+  // Build the complete HTML document with inline CSS
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOT Health Check Report - ${new Date(results.timestamp).toLocaleString()}</title>
+  <style>
+    ${getHealthCheckCSS()}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <h1>DOT Health Check Report</h1>
+      <div class="report-meta">
+        <div class="meta-item">
+          <strong>Org:</strong> ${escapeHtml(results.orgUrl)}
+        </div>
+        <div class="meta-item">
+          <strong>Date:</strong> ${new Date(results.timestamp).toLocaleString()}
+        </div>
+        <div class="meta-item">
+          <strong>Duration:</strong> ${results.duration}s
+        </div>
+      </div>
+      <button id="downloadPdfBtn" class="download-pdf-btn no-print">Download PDF</button>
+    </header>
+
+    <div class="checks-grid">
+      ${results.checks.map(check => buildCheckTile(check)).join('')}
+    </div>
+
+    <footer class="report-footer no-print">
+      <p>Generated by Salesforce Picklist Manager Extension v1.1.0</p>
+    </footer>
+  </div>
+
+  <script>
+    // PDF Download functionality - wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+      const downloadBtn = document.getElementById('downloadPdfBtn');
+      if (downloadBtn) {
+        downloadBtn.addEventListener('click', function() {
+          console.log('Download PDF button clicked - opening print dialog');
+          window.print();
+        });
+        console.log('PDF download button listener attached successfully');
+      } else {
+        console.error('Download PDF button not found in DOM');
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+  return html;
+}
+
+function buildCheckTile(check) {
+  let statusClass = 'status-success';
+  let statusIcon = '✓';
+
+  if (check.status === 'error') {
+    statusClass = 'status-error';
+    statusIcon = '✗';
+  } else if (check.status === 'warning') {
+    statusClass = 'status-warning';
+    statusIcon = '⚠';
+  } else {
+    // Check if any fields don't match
+    const hasIssues = check.fields && check.fields.some(f => !f.match);
+    if (hasIssues) {
+      statusClass = 'status-warning';
+      statusIcon = '⚠';
+    }
+  }
+
+  let tileContent = '';
+
+  if (check.status === 'error') {
+    tileContent = `<div class="error-message">${escapeHtml(check.message)}</div>`;
+  } else if (check.name === 'Org Limits' && check.storage) {
+    // Special rendering for storage
+    tileContent = buildStorageDisplay(check.storage);
+  } else if (check.fields && check.fields.length > 0) {
+    tileContent = `<div class="fields-list">
+      ${check.fields.map(field => buildFieldRow(field)).join('')}
+    </div>`;
+  } else if (check.status === 'warning') {
+    tileContent = `<div class="warning-message">${escapeHtml(check.message)}</div>`;
+  }
+
+  return `
+    <div class="check-tile ${statusClass}">
+      <div class="check-header">
+        <h3 class="check-title">${escapeHtml(check.name)}</h3>
+        <div class="status-icon">${statusIcon}</div>
+      </div>
+      <div class="check-content">
+        ${tileContent}
+      </div>
+    </div>
+  `;
+}
+
+function buildFieldRow(field) {
+  const matchClass = field.match ? 'field-match' : 'field-mismatch';
+  const statusIndicator = field.match ? '●' : '●';
+
+  // For URL fields that don't match, only show expected value to avoid overflow
+  const isUrlField = field.label === 'DOT Help URL' || field.label === 'E-Signature URL';
+  const showOnlyExpected = isUrlField && !field.match;
+
+  // Build help text if present and field doesn't match
+  const helpTextHtml = (!field.match && field.helpText)
+    ? `<div class="field-help-text">
+         <span class="help-icon">ℹ</span>
+         <span class="help-message">${escapeHtml(field.helpText)}</span>
+       </div>`
+    : '';
+
+  return `
+    <div class="field-row ${matchClass}">
+      <div>
+        <div class="field-label">${escapeHtml(field.label)}</div>
+        <div class="field-value">
+          <span class="status-dot">${statusIndicator}</span>
+          ${showOnlyExpected
+            ? `<span class="value">${escapeHtml(String(field.expected))}</span>`
+            : `<span class="value">${escapeHtml(String(field.value))}</span>
+          ${field.expected !== null && field.expected !== undefined ?
+            `<span class="expected">(Expected: ${escapeHtml(String(field.expected))})</span>` : ''}`}
+        </div>
+      </div>
+      ${helpTextHtml}
+    </div>
+  `;
+}
+
+function buildStorageDisplay(storage) {
+  const getStorageClass = (status) => {
+    if (status === 'critical') return 'storage-critical';
+    if (status === 'warning') return 'storage-warning';
+    return 'storage-ok';
+  };
+
+  return `
+    <div class="storage-section">
+      <div class="storage-item ${getStorageClass(storage.file.status)}">
+        <div class="storage-label">File Storage</div>
+        <div class="storage-bar">
+          <div class="storage-progress" style="width: ${storage.file.usedPercent}%"></div>
+        </div>
+        <div class="storage-text">
+          ${storage.file.used} MB / ${storage.file.max} MB (${storage.file.usedPercent}% used)
+        </div>
+      </div>
+      <div class="storage-item ${getStorageClass(storage.data.status)}">
+        <div class="storage-label">Data Storage</div>
+        <div class="storage-bar">
+          <div class="storage-progress" style="width: ${storage.data.usedPercent}%"></div>
+        </div>
+        <div class="storage-text">
+          ${storage.data.used} MB / ${storage.data.max} MB (${storage.data.usedPercent}% used)
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getHealthCheckCSS() {
+  return `
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .report-header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .report-header h1 {
+      color: #333;
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+
+    .report-meta {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .meta-item {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .meta-item strong {
+      color: #333;
+      margin-right: 5px;
+    }
+
+    .download-pdf-btn {
+      background: #0176d3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .download-pdf-btn:hover {
+      background: #014486;
+    }
+
+    .checks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .check-tile {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .check-tile:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    .check-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .check-title {
+      font-size: 18px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .status-icon {
+      font-size: 24px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-weight: bold;
+    }
+
+    .status-success .status-icon {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-warning .status-icon {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-error .status-icon {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .fields-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 6px;
+      background: #f8f9fa;
+    }
+
+    .field-row > div:first-child {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .field-label {
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .field-value {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 14px;
+      flex-wrap: wrap;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .status-dot {
+      font-size: 12px;
+    }
+
+    .field-match .status-dot {
+      color: #28a745;
+    }
+
+    .field-mismatch .status-dot {
+      color: #dc3545;
+    }
+
+    .value {
+      font-weight: 500;
+      color: #333;
+      word-break: break-all;
+      overflow-wrap: break-word;
+      max-width: 100%;
+    }
+
+    .expected {
+      color: #666;
+      font-size: 12px;
+      font-style: italic;
+      word-break: break-all;
+      overflow-wrap: break-word;
+      max-width: 100%;
+    }
+
+    .field-help-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .help-icon {
+      color: #856404;
+      font-size: 16px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .help-message {
+      color: #856404;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .error-message, .warning-message {
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .warning-message {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+
+    .storage-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .storage-item {
+      padding: 12px;
+      border-radius: 6px;
+      background: #f8f9fa;
+    }
+
+    .storage-label {
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .storage-bar {
+      width: 100%;
+      height: 20px;
+      background: #e9ecef;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .storage-progress {
+      height: 100%;
+      transition: width 0.3s ease;
+      border-radius: 10px;
+    }
+
+    .storage-ok .storage-progress {
+      background: linear-gradient(90deg, #28a745, #20c997);
+    }
+
+    .storage-warning .storage-progress {
+      background: linear-gradient(90deg, #ffc107, #fd7e14);
+    }
+
+    .storage-critical .storage-progress {
+      background: linear-gradient(90deg, #dc3545, #c82333);
+    }
+
+    .storage-text {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .report-footer {
+      text-align: center;
+      color: white;
+      padding: 20px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 1200px) {
+      .checks-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .report-meta {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .check-tile {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+
+      .report-header {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+    }
+  `;
+}
+
+// ============================================================================
+// SETTINGS
+// ============================================================================
+
+function handleSettings() {
+  // Open settings page in new tab
+  chrome.tabs.create({ url: chrome.runtime.getURL('settings/settings.html') }, (tab) => {
+    console.log('[Popup] Settings page opened in new tab:', tab.id);
+  });
 }
 
 // ============================================================================

@@ -76,6 +76,11 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, data: objects });
         break;
 
+      case 'CHECK_FOR_UPDATES':
+        await UpdateChecker.checkForUpdates();
+        sendResponse({ success: true });
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown action' });
     }

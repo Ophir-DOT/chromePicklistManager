@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Health Checks - Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Custom Health Checks</h1>
+      <p class="subtitle">Add custom SOQL queries to your DOT Health Check report</p>
+    </header>
+
+    <!-- Update Section -->
+    <div class="update-section">
+      <div class="update-info">
+        <div class="version-info">
+          <strong>Current Version:</strong>
+          <span id="currentVersion">Loading...</span>
+        </div>
+        <div id="updateStatus" class="update-status">
+          <span id="updateStatusText">Checking for updates...</span>
+        </div>
+      </div>
+      <button id="checkUpdateBtn" class="btn btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+        </svg>
+        Check for Updates
+      </button>
+    </div>
+
+    <div class="actions">
+      <button id="addCheckBtn" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        Add Custom Check
+      </button>
+    </div>
+
+    <div id="checksList" class="checks-list">
+      <!-- Custom checks will be dynamically inserted here -->
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+      </svg>
+      <p>No custom health checks yet</p>
+      <p class="hint">Click "Add Custom Check" to create your first custom health check</p>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="checkModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Custom Health Check</h2>
+        <button id="closeModal" class="btn-close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+
+      <form id="checkForm">
+        <div class="form-group">
+          <label for="checkTitle">Tile Title *</label>
+          <input
+            type="text"
+            id="checkTitle"
+            name="title"
+            placeholder="e.g., Active Opportunities"
+            required
+            maxlength="100"
+          >
+          <span class="form-hint">This will appear as the tile header in the health check report</span>
+        </div>
+
+        <div class="form-group">
+          <label for="checkQuery">SOQL Query *</label>
+          <textarea
+            id="checkQuery"
+            name="query"
+            rows="4"
+            placeholder="e.g., SELECT COUNT() FROM Opportunity WHERE IsClosed = false"
+            required
+          ></textarea>
+          <span class="form-hint">Enter a valid SOQL query. Use COUNT() for aggregate queries.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="expectedType">Expected Value Type *</label>
+          <select id="expectedType" name="expectedType" required>
+            <option value="none">No Expected Value (Just Display Results)</option>
+            <option value="zero">Expect Zero (0)</option>
+            <option value="value">Expect Specific Value</option>
+          </select>
+          <span class="form-hint">Choose how to validate the query results</span>
+        </div>
+
+        <div class="form-group" id="expectedValueGroup" style="display: none;">
+          <label for="expectedValue">Expected Value *</label>
+          <input
+            type="text"
+            id="expectedValue"
+            name="expectedValue"
+            placeholder="e.g., 100"
+          >
+          <span class="form-hint">The value you expect the query to return</span>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="checkEnabled" name="enabled" checked>
+            <span>Enable this health check</span>
+          </label>
+          <span class="form-hint">Disabled checks won't appear in the health report</span>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" id="saveBtn" class="btn btn-primary">Save Health Check</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

@@ -5,6 +5,51 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-11-15
+
+### Added
+- **Picklist Loader**: New dedicated button to deploy picklist value changes
+- **Dependency Loader**: New dedicated button to import and deploy field dependencies
+- **DOT Health Check**: Comprehensive org health check feature with visual report generation
+  - **System Information**: Organization details (name, type, sandbox status, instance name)
+  - **Security Settings**: Lightning Web Security (Locker Service Next) validation
+  - **Org Limits**: Data and file storage monitoring with usage percentages
+  - **API Usage**: Daily API call limits and usage tracking
+  - **Environment Settings**: Closed system, lifecycle locks, DOT Help URL, E-Signature URL, and Email Deliverability
+  - **Data Migration**: Pre-migration data integrity checks
+    - Opened Requirement Revisions validation
+    - Orphaned Document Revisions detection
+    - Content Document Links verification
+    - Actionable help text for failed checks
+  - Exportable HTML reports with print-to-PDF functionality
+- **Automatic Update Checker**: GitHub integration for automatic update notifications
+  - Background worker checks for new releases every 24 hours
+  - Update banner in popup when new version available
+  - One-click download to latest release
+  - Version comparison and notification system
+  - Manual "Check for Updates" button in settings page
+- **Export Dependencies**: Export field dependencies and record type picklist mappings to CSV
+  - Controlling/dependent field relationships
+  - Record type specific picklist values
+  - Single object selection with radio buttons
+- **2x2 Button Grid Layout**: Reorganized main menu for better UX
+  - Row 1: Export Picklists | Export Dependencies
+  - Row 2: Picklist Loader | Dependency Loader
+  - Separate export and import workflows for clarity
+
+### Changed
+- Renamed "Deploy Changes" to "Picklist Loader" for clarity
+- Moved dependency import functionality from Export Dependencies page to dedicated "Dependency Loader" view
+- Improved UI layout with grid-based button organization
+- Enhanced user experience with clearer separation between export and loader functions
+
+### Technical
+- Added `background/health-check-api.js` for org health validation
+- Enhanced Metadata API with dependency reading capabilities
+- Implemented GitHub API integration for release checking
+- Added update notification system with local storage persistence
+- Grid CSS layout for responsive button arrangement
+
 ## [1.0.0] - 2024-11-13
 
 ### Added
