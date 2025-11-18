@@ -5,6 +5,64 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 1.5.0
+
+### Focus: Advanced Administration & Security Features
+
+### Planned
+- **Validation Rule Manager**: Comprehensive tool for managing validation rules
+  - Export all validation rules to CSV/JSON
+  - Disable/enable validation rules in bulk (useful during migrations)
+  - Test validation rules against sample data
+  - Search across validation rules by formula or error message
+  - Clone validation rules to other objects
+
+- **Profile/Permission Set Comparison & Import**: Security and compliance tool
+  - Compare field-level security across profiles/permission sets
+  - Identify permission gaps or over-privileges
+  - Export object/field permissions matrix
+  - Import permission exports from another environment
+  - Bulk permission updates for specific fields
+  - Track changes over time
+  - Map profiles/permission sets between source and target environments
+  - Preview permission changes before deployment
+  - Selective import (choose which permissions to apply)
+
+- **Org Compare Tool**: Configuration drift detection and sync
+  - Side-by-side object comparison (fields, validation rules, etc.)
+  - Configuration drift detection between environments
+  - Sync wizard to align configurations
+  - Pre-migration verification
+  - Compare picklists, workflows, validation rules
+  - Export comparison reports
+  - Highlight differences with visual diff
+
+- **Dark Mode Theme**: Dot Compliance branded dark mode
+  - Toggle between light/dark themes
+  - Persist user preference
+  - Maintain brand colors in dark mode (Deep Purple #270648, Pink #DD0087)
+  - Smooth theme transitions
+  - Apply to popup, settings, and health check pages
+  - Update design tokens for dark mode variants
+
+- **Batch Job Monitor**: Real-time async operation monitoring
+  - View all running/queued Apex jobs
+  - Monitor deployment queue
+  - Track long-running operations
+  - Quick abort capability
+  - Filter by job type (Batch, Future, Queueable, Scheduled)
+  - Show job progress and status
+  - Auto-refresh with configurable interval
+  - Email notifications for job completion/failure
+
+### Added
+
+### Changed
+
+### Technical
+
+---
+
 ## [1.4.0] - 2025-11-18
 
 ### Focus: Enhanced Features & Shortcuts
