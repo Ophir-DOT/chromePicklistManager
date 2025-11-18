@@ -454,7 +454,6 @@ async function showDependencyLoader() {
   // Reset dependency loader state
   parsedDepsData = null;
   document.getElementById('depsFileInput').value = '';
-  document.getElementById('replaceDepsMode').checked = false;
   document.getElementById('importDepsBtn').disabled = true;
   document.getElementById('importDepsPreview').classList.add('hidden');
   document.getElementById('importDepsStatus').textContent = '';
@@ -920,7 +919,7 @@ async function previewDepsImport() {
   const previewEl = document.getElementById('importDepsPreview');
   const contentEl = document.getElementById('importDepsPreviewContent');
   const statusEl = document.getElementById('importDepsStatus');
-  const replaceMode = document.getElementById('replaceDepsMode').checked;
+  const replaceMode = false; // Always append mode (Salesforce API limitation)
 
   try {
     statusEl.textContent = 'Loading preview...';
@@ -981,7 +980,7 @@ async function deployDepsImport() {
 
   const deployBtn = document.getElementById('deployDepsBtn');
   const statusEl = document.getElementById('importDepsStatus');
-  const replaceMode = document.getElementById('replaceDepsMode').checked;
+  const replaceMode = false; // Always append mode (Salesforce API limitation)
 
   try {
     deployBtn.disabled = true;
@@ -1742,31 +1741,18 @@ function resetUpdatePicklistView() {
 
 async function handleHealthCheck() {
   try {
-    console.log('[Popup] Starting DOT Health Check...');
+    console.log('[Popup] Starting Progressive DOT Health Check...');
 
-    // Show loading indicator (reuse existing status or create temp overlay)
-    const loadingMessage = 'Running health checks...';
+    // Open health check page immediately (no loading overlay)
+    const healthCheckUrl = chrome.runtime.getURL('health-check/health-check.html');
 
-    // Create a simple loading overlay
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
-    overlay.innerHTML = '<div style="background: white; padding: 30px; border-radius: 8px; text-align: center;"><div style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Running DOT Health Check</div><div style="color: #666;">Please wait...</div></div>';
-    document.body.appendChild(overlay);
-
-    // Run all health checks
-    const results = await HealthCheckAPI.runAllHealthChecks();
-
-    console.log('[Popup] Health check results:', results);
-
-    // Remove loading overlay
-    document.body.removeChild(overlay);
-
-    // Generate and open HTML report
-    generateHealthCheckReport(results);
+    chrome.tabs.create({ url: healthCheckUrl }, (tab) => {
+      console.log('[Popup] Progressive health check page opened in tab:', tab.id);
+    });
 
   } catch (error) {
-    console.error('[Popup] Health check failed:', error);
-    alert(`Health check failed: ${error.message}`);
+    console.error('[Popup] Failed to open health check:', error);
+    alert(`Failed to open health check: ${error.message}`);
   }
 }
 
