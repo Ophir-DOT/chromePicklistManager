@@ -83,7 +83,7 @@ body {
 .container {
   max-width: 1400px;
   margin: 0 auto;
-  background: white;
+  background: rgb(240, 240, 240);
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-xl);
   box-shadow: 0 10px 40px rgba(39, 6, 72, 0.2);

@@ -110,6 +110,13 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, result: checkResult });
         break;
 
+      case 'CHECK_DOCUMENT_REVISION_SHARING':
+        const shareCheckResult = await HealthCheckAPI.checkDocumentRevisionSharing(
+          request.recordId
+        );
+        sendResponse({ success: true, data: shareCheckResult });
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown action' });
     }
@@ -291,3 +298,68 @@ function compareFieldValues(source, target) {
 
   return diffs;
 }
+
+// Keyboard shortcuts handler
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log('[ServiceWorker] Command received:', command);
+
+  try {
+    // Get the current active tab to ensure we're on a Salesforce page
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab) {
+      console.warn('[ServiceWorker] No active tab found');
+      return;
+    }
+
+    // Check if we're on a Salesforce page
+    const isSalesforcePage = tab.url && (
+      tab.url.includes('salesforce.com') ||
+      tab.url.includes('force.com') ||
+      tab.url.includes('cloudforce.com') ||
+      tab.url.includes('visualforce.com')
+    );
+
+    if (!isSalesforcePage) {
+      console.warn('[ServiceWorker] Not on a Salesforce page, ignoring command');
+      return;
+    }
+
+    // Route command to appropriate action
+    switch (command) {
+      case 'export-picklists':
+        // Open popup and trigger export picklists
+        await chrome.action.openPopup();
+        // Send message to popup to trigger export
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ action: 'TRIGGER_EXPORT_PICKLISTS' });
+        }, 100);
+        break;
+
+      case 'picklist-loader':
+        await chrome.action.openPopup();
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ action: 'TRIGGER_PICKLIST_LOADER' });
+        }, 100);
+        break;
+
+      case 'health-check':
+        // Directly open health check in new tab
+        const healthCheckUrl = chrome.runtime.getURL('health-check/health-check.html');
+        await chrome.tabs.create({ url: healthCheckUrl });
+        break;
+
+      case 'check-share-files':
+        await chrome.action.openPopup();
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ action: 'TRIGGER_CHECK_SHARE_FILES' });
+        }, 100);
+        break;
+
+      default:
+        console.warn('[ServiceWorker] Unknown command:', command);
+    }
+  } catch (error) {
+    console.error('[ServiceWorker] Error handling command:', error);
+  }
+});

@@ -23,10 +23,14 @@ let selectedUpdateField = null;
 let currentFieldMetadata = null;
 let previewData = null;
 
+// Global state for current page context
+let currentPageContext = null;
+
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   await checkConnection();
   await checkForUpdates();
+  await updateCheckShareFilesButton();
   setupEventListeners();
 });
 
@@ -84,6 +88,7 @@ function setupEventListeners() {
   document.getElementById('dependencyLoaderBtn').addEventListener('click', showDependencyLoader);
   document.getElementById('compareBtn').addEventListener('click', handleCompare);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
+  document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
   // Export view buttons
@@ -1753,6 +1758,98 @@ async function handleHealthCheck() {
   } catch (error) {
     console.error('[Popup] Failed to open health check:', error);
     alert(`Failed to open health check: ${error.message}`);
+  }
+}
+
+async function updateCheckShareFilesButton() {
+  const button = document.getElementById('checkShareFilesBtn');
+  const statusEl = document.getElementById('checkShareFilesStatus');
+
+  try {
+    // Get current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.id) {
+      button.disabled = true;
+      return;
+    }
+
+    // Ask content script for current page context
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'GET_CURRENT_OBJECT' });
+
+    currentPageContext = response?.context;
+
+    console.log('[Popup] Current page context:', currentPageContext);
+
+    // Enable button only if on CompSuite__Document_Revision__c record page
+    if (currentPageContext &&
+        currentPageContext.objectName === 'CompSuite__Document_Revision__c' &&
+        currentPageContext.isRecordPage &&
+        currentPageContext.recordId) {
+      button.disabled = false;
+      button.title = 'Check file sharing for this document revision';
+      statusEl.textContent = '';
+    } else {
+      button.disabled = true;
+      button.title = 'Available only on CompSuite__Document_Revision__c record pages';
+      statusEl.textContent = '';
+    }
+
+  } catch (error) {
+    console.log('[Popup] Could not get current object context:', error.message);
+    button.disabled = true;
+  }
+}
+
+async function handleCheckShareFiles() {
+  const statusEl = document.getElementById('checkShareFilesStatus');
+
+  try {
+    if (!currentPageContext || !currentPageContext.recordId) {
+      statusEl.textContent = 'Error: No record context available';
+      statusEl.className = 'status-message error';
+      return;
+    }
+
+    statusEl.textContent = 'Checking file sharing...';
+    statusEl.className = 'status-message loading';
+
+    console.log('[Popup] Checking share files for record:', currentPageContext.recordId);
+
+    // Send message to background to run the check
+    const response = await chrome.runtime.sendMessage({
+      action: 'CHECK_DOCUMENT_REVISION_SHARING',
+      recordId: currentPageContext.recordId
+    });
+
+    if (response.success) {
+      const result = response.data;
+
+      // Display inline summary
+      if (result.status === 'success') {
+        statusEl.innerHTML = `
+          <strong>Share Check Complete:</strong><br>
+          ${result.summary || 'Check completed successfully. See details below.'}
+        `;
+        statusEl.className = 'status-message success';
+
+        // Also log details for debugging
+        console.log('[Popup] Share check results:', result);
+      } else {
+        statusEl.innerHTML = `
+          <strong>Check Failed:</strong><br>
+          ${result.message || 'Unknown error occurred'}
+        `;
+        statusEl.className = 'status-message error';
+      }
+    } else {
+      throw new Error(response.error || 'Unknown error');
+    }
+
+  } catch (error) {
+    console.error('[Popup] Check share files error:', error);
+    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.className = 'status-message error';
   }
 }
 

@@ -5,7 +5,56 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 1.3.0
+## [Unreleased] - 1.4.0
+
+### Focus: Enhanced Features & Shortcuts
+
+### Added
+- **Check Share Files**: Document revision file sharing analysis feature
+  - New button in popup (enabled only on CompSuite__Document_Revision__c record pages)
+  - Automatically detects current Salesforce page context and record ID
+  - Queries PDF_ID__c and FILE_ID__c from document revision records
+  - Converts ContentVersion IDs to ContentDocumentIds
+  - Analyzes ContentDocumentLink sharing relationships
+  - Displays inline summary with share counts per file
+  - Provides detailed sharing information (LinkedEntityId, ShareType, Visibility)
+  - Smart context detection for Lightning and Classic UI
+
+- **Keyboard Shortcuts**: Global keyboard shortcuts for main features
+  - **Export Picklists**: `Ctrl+Shift+E` (Mac: `Cmd+Shift+E`)
+  - **Picklist Loader**: `Ctrl+Shift+L` (Mac: `Cmd+Shift+L`)
+  - **DOT Health Check**: `Ctrl+Shift+H` (Mac: `Cmd+Shift+H`)
+  - **Check Share Files**: `Ctrl+Shift+F` (Mac: `Cmd+Shift+F`)
+  - Shortcuts work globally on any Salesforce page
+  - New settings section to view and manage shortcuts
+  - Click any shortcut to customize via Chrome's shortcuts page
+  - "Clear All" option to reset all shortcuts
+  - Chrome extension limit: 4 keyboard shortcuts maximum
+
+### Changed
+- Enhanced content script object detection to capture record IDs
+- Improved context awareness for Lightning record pages and object homes
+- Updated popup button states with disabled styling
+- Settings page now displays keyboard shortcuts configuration
+
+### Technical
+- Added `commands` section to manifest.json for keyboard shortcuts
+- Enhanced `content/injector.js` with record-level page detection
+  - Detects Lightning record pages: `/lightning/r/ObjectName/RecordId/view`
+  - Detects Lightning object home: `/lightning/o/ObjectName/home`
+  - Returns full context object with `objectName`, `recordId`, `isRecordPage`
+- Added `chrome.commands.onCommand` listener in service-worker.js
+- New method: `HealthCheckAPI.checkDocumentRevisionSharing(recordId)`
+  - Multi-step SOQL query process for file sharing analysis
+  - Returns structured data with share counts and details
+- Added `CHECK_DOCUMENT_REVISION_SHARING` message handler
+- New keyboard shortcuts section in settings page with full styling
+- Updated `settings.js` with shortcuts management logic
+  - `loadKeyboardShortcuts()` - Load and display current shortcuts
+  - `clearAllShortcuts()` - Clear all shortcut bindings
+- CSS enhancements for disabled button states and shortcuts UI
+
+## [1.3.0] - 2025-11-18
 
 ### Focus: Pop-up UI Redesign - Dot Compliance Brand Alignment
 

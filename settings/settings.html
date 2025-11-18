@@ -36,6 +36,79 @@
       </button>
     </div>
 
+    <!-- Keyboard Shortcuts Section -->
+    <section class="shortcuts-section">
+      <header class="section-header">
+        <div>
+          <h2>Keyboard Shortcuts</h2>
+          <p class="subtitle">Quick access to features via keyboard commands</p>
+        </div>
+        <button id="clearAllShortcutsBtn" class="btn btn-secondary btn-small">
+          <span class="material-symbols-rounded">clear_all</span>
+          Clear All
+        </button>
+      </header>
+
+      <div class="shortcuts-list">
+        <div class="shortcut-item">
+          <div class="shortcut-info">
+            <span class="material-symbols-rounded shortcut-icon">download</span>
+            <div class="shortcut-details">
+              <strong>Export Picklists</strong>
+              <span class="shortcut-description">Export active picklist values for selected objects</span>
+            </div>
+          </div>
+          <div class="shortcut-key-display" data-command="export-picklists">
+            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd>
+          </div>
+        </div>
+
+        <div class="shortcut-item">
+          <div class="shortcut-info">
+            <span class="material-symbols-rounded shortcut-icon">upload</span>
+            <div class="shortcut-details">
+              <strong>Picklist Loader</strong>
+              <span class="shortcut-description">Deploy picklist value changes</span>
+            </div>
+          </div>
+          <div class="shortcut-key-display" data-command="picklist-loader">
+            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd>
+          </div>
+        </div>
+
+        <div class="shortcut-item">
+          <div class="shortcut-info">
+            <span class="material-symbols-rounded shortcut-icon">health_and_safety</span>
+            <div class="shortcut-details">
+              <strong>DOT Health Check</strong>
+              <span class="shortcut-description">Run comprehensive org health check</span>
+            </div>
+          </div>
+          <div class="shortcut-key-display" data-command="health-check">
+            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd>
+          </div>
+        </div>
+
+        <div class="shortcut-item">
+          <div class="shortcut-info">
+            <span class="material-symbols-rounded shortcut-icon">folder_shared</span>
+            <div class="shortcut-details">
+              <strong>Check Share Files</strong>
+              <span class="shortcut-description">Check document revision file sharing</span>
+            </div>
+          </div>
+          <div class="shortcut-key-display" data-command="check-share-files">
+            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
+          </div>
+        </div>
+      </div>
+
+      <div class="shortcuts-hint">
+        <span class="material-symbols-rounded">info</span>
+        <p>Chrome limits extensions to 4 keyboard shortcuts. Click any shortcut to customize, or visit <strong>chrome://extensions/shortcuts</strong></p>
+      </div>
+    </section>
+
     <div class="actions">
       <button id="addCheckBtn" class="btn btn-primary">
         <span class="material-symbols-rounded">add_circle</span>

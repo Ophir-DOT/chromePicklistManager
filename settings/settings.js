@@ -14,6 +14,7 @@ class HealthCheckSettings {
     this.render();
     await this.loadVersionInfo();
     await this.checkUpdateStatus();
+    await this.loadKeyboardShortcuts();
   }
 
   setupEventListeners() {
@@ -24,6 +25,21 @@ class HealthCheckSettings {
         this.manualUpdateCheck();
       });
     }
+
+    // Clear all shortcuts button
+    const clearAllShortcutsBtn = document.getElementById('clearAllShortcutsBtn');
+    if (clearAllShortcutsBtn) {
+      clearAllShortcutsBtn.addEventListener('click', () => {
+        this.clearAllShortcuts();
+      });
+    }
+
+    // Shortcut item click handlers - open Chrome shortcuts page
+    document.querySelectorAll('.shortcut-item').forEach(item => {
+      item.addEventListener('click', () => {
+        chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+      });
+    });
 
     // Add check button
     document.getElementById('addCheckBtn').addEventListener('click', () => {
@@ -290,6 +306,69 @@ class HealthCheckSettings {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // ============================================================================
+  // KEYBOARD SHORTCUTS
+  // ============================================================================
+
+  async loadKeyboardShortcuts() {
+    try {
+      // Get all commands from Chrome
+      const commands = await chrome.commands.getAll();
+      console.log('[Settings] Loaded shortcuts:', commands);
+
+      // Update the display for each shortcut
+      commands.forEach(command => {
+        const displayEl = document.querySelector(`[data-command="${command.name}"]`);
+        if (displayEl) {
+          if (command.shortcut) {
+            // Format the shortcut for display
+            const keys = command.shortcut.split('+').map(key => key.trim());
+            displayEl.innerHTML = keys.map(key => `<kbd>${key}</kbd>`).join(' + ');
+          } else {
+            displayEl.innerHTML = '<span class="no-shortcut">Not set</span>';
+          }
+        }
+      });
+    } catch (error) {
+      console.error('[Settings] Error loading shortcuts:', error);
+    }
+  }
+
+  async clearAllShortcuts() {
+    if (!confirm('Are you sure you want to clear all keyboard shortcuts? You can reconfigure them later in chrome://extensions/shortcuts')) {
+      return;
+    }
+
+    try {
+      // Get all commands
+      const commands = await chrome.commands.getAll();
+
+      // Clear each command by updating with empty shortcut
+      for (const command of commands) {
+        try {
+          await chrome.commands.update({
+            name: command.name,
+            shortcut: ''
+          });
+        } catch (error) {
+          console.warn(`[Settings] Could not clear shortcut for ${command.name}:`, error);
+        }
+      }
+
+      console.log('[Settings] All shortcuts cleared');
+
+      // Reload the shortcuts display
+      await this.loadKeyboardShortcuts();
+
+      // Show success message
+      alert('All keyboard shortcuts have been cleared. You can reconfigure them by clicking on any shortcut or visiting chrome://extensions/shortcuts');
+
+    } catch (error) {
+      console.error('[Settings] Error clearing shortcuts:', error);
+      alert('Failed to clear shortcuts. Please try again.');
+    }
   }
 
   // ============================================================================

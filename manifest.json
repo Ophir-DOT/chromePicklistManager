@@ -62,5 +62,36 @@
       "resources": ["assets/*"],
       "matches": ["https://*.salesforce.com/*", "https://*.force.com/*"]
     }
-  ]
+  ],
+
+  "commands": {
+    "export-picklists": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Export Picklists"
+    },
+    "picklist-loader": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Picklist Loader"
+    },
+    "health-check": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H"
+      },
+      "description": "DOT Health Check"
+    },
+    "check-share-files": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Check Share Files"
+    }
+  }
 }

@@ -215,6 +215,25 @@ main {
   font-size: 20px;
 }
 
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--brand-color-neutral-light);
+  color: var(--brand-color-neutral-med);
+}
+
+.action-button:disabled:hover {
+  background: var(--brand-color-neutral-light);
+  border-color: var(--brand-color-neutral-med);
+  color: var(--brand-color-neutral-med);
+  box-shadow: none;
+  transform: none;
+}
+
+.action-button:disabled .icon {
+  color: var(--brand-color-neutral-med);
+}
+
 /* Material Symbols Icon styling */
 .material-symbols-rounded {
   font-variation-settings:

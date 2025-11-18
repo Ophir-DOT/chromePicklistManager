@@ -34,23 +34,67 @@ function openPopup() {
   chrome.runtime.sendMessage({ action: 'OPEN_POPUP' });
 }
 
-// Detect object name from current page
+// Detect object name and record ID from current page
 function detectCurrentObject() {
   const url = window.location.href;
 
-  // Lightning
-  const lightningMatch = url.match(/\/lightning\/[or]\/([^/]+)/);
-  if (lightningMatch) {
-    return lightningMatch[1];
+  // Lightning Record Page: /lightning/r/ObjectName/RecordId/view
+  const lightningRecordMatch = url.match(/\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15,18})\/view/);
+  if (lightningRecordMatch) {
+    return {
+      objectName: lightningRecordMatch[1],
+      recordId: lightningRecordMatch[2],
+      isRecordPage: true
+    };
   }
 
-  // Classic
+  // Lightning Object Home: /lightning/o/ObjectName/home
+  const lightningHomeMatch = url.match(/\/lightning\/o\/([^/]+)\/home/);
+  if (lightningHomeMatch) {
+    return {
+      objectName: lightningHomeMatch[1],
+      recordId: null,
+      isRecordPage: false
+    };
+  }
+
+  // Classic Record Page: /RecordId
+  const classicRecordMatch = url.match(/\/([a-zA-Z0-9]{15,18})$/);
+  if (classicRecordMatch) {
+    // Try to determine object from page structure
+    const objectName = detectObjectFromClassicPage();
+    if (objectName) {
+      return {
+        objectName: objectName,
+        recordId: classicRecordMatch[1],
+        isRecordPage: true
+      };
+    }
+  }
+
+  // Classic Object Home
   const classicMatch = url.match(/\/([a-zA-Z0-9_]+)\/o$/);
   if (classicMatch) {
-    return classicMatch[1];
+    return {
+      objectName: classicMatch[1],
+      recordId: null,
+      isRecordPage: false
+    };
   }
 
   return null;
+}
+
+// Helper to detect object from Classic page structure
+function detectObjectFromClassicPage() {
+  // Try to find object name from page title or breadcrumbs
+  const breadcrumbs = document.querySelectorAll('.breadcrumb');
+  if (breadcrumbs.length > 0) {
+    // Parse breadcrumb to find object
+    const breadcrumbText = breadcrumbs[0].textContent;
+    // This is a fallback - may need enhancement
+  }
+  return null; // Return null if we can't determine
 }
 
 // Initialize
@@ -64,11 +108,11 @@ if (isSalesforcePage()) {
     const url = window.location.href;
     if (url !== lastUrl) {
       lastUrl = url;
-      const objectName = detectCurrentObject();
-      if (objectName) {
+      const context = detectCurrentObject();
+      if (context) {
         chrome.runtime.sendMessage({
           action: 'CURRENT_OBJECT_CHANGED',
-          objectName
+          context
         });
       }
     }
@@ -78,7 +122,7 @@ if (isSalesforcePage()) {
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GET_CURRENT_OBJECT') {
-    sendResponse({ objectName: detectCurrentObject() });
+    sendResponse({ context: detectCurrentObject() });
   }
   return true;
 });

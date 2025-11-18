@@ -720,6 +720,138 @@ class HealthCheckAPI {
   }
 
   /**
+   * Check Document Revision File Sharing
+   * Analyzes ContentDocumentLink sharing for files associated with a Document Revision record
+   * @param {string} recordId - CompSuite__Document_Revision__c record ID
+   * @returns {Promise<object>} - Check result with sharing details
+   */
+  static async checkDocumentRevisionSharing(recordId) {
+    console.log('[HealthCheckAPI] Checking document revision sharing for:', recordId);
+
+    try {
+      // Step 1: Get PDF_ID__c and FILE_ID__c from Document Revision record
+      const revisionQuery = `SELECT Id, Name, CompSuite__PDF_ID__c, CompSuite__FILE_ID__c,
+                             CompSuite__PDF_URL__c, CompSuite__File_URL__c
+                             FROM CompSuite__Document_Revision__c
+                             WHERE Id = '${recordId}'`;
+
+      const revisionResult = await this.soqlQuery(revisionQuery);
+
+      if (!revisionResult.records || revisionResult.records.length === 0) {
+        return {
+          status: 'error',
+          message: 'Document Revision record not found',
+          summary: 'Record not found'
+        };
+      }
+
+      const revision = revisionResult.records[0];
+      const pdfId = revision.CompSuite__PDF_ID__c;
+      const fileId = revision.CompSuite__FILE_ID__c;
+
+      console.log('[HealthCheckAPI] Found revision:', revision.Name);
+      console.log('[HealthCheckAPI] PDF_ID:', pdfId, 'FILE_ID:', fileId);
+
+      if (!pdfId && !fileId) {
+        return {
+          status: 'warning',
+          message: 'No file IDs found on this Document Revision',
+          summary: 'No files attached (PDF_ID and FILE_ID are both empty)'
+        };
+      }
+
+      const fileDetails = [];
+
+      // Step 2: For each ID, get ContentDocumentId from ContentVersion
+      const versionIds = [pdfId, fileId].filter(id => id);
+
+      if (versionIds.length === 0) {
+        return {
+          status: 'warning',
+          message: 'No valid file IDs to check',
+          summary: 'No files to analyze'
+        };
+      }
+
+      const versionQuery = `SELECT Id, ContentDocumentId, Title
+                            FROM ContentVersion
+                            WHERE Id IN ('${versionIds.join("','")}')`;
+
+      const versionResult = await this.soqlQuery(versionQuery);
+
+      if (!versionResult.records || versionResult.records.length === 0) {
+        return {
+          status: 'error',
+          message: 'ContentVersion records not found for the specified IDs',
+          summary: 'File version records not found'
+        };
+      }
+
+      console.log('[HealthCheckAPI] Found', versionResult.records.length, 'ContentVersion records');
+
+      // Step 3: For each ContentDocumentId, query ContentDocumentLink
+      const documentIds = versionResult.records.map(v => v.ContentDocumentId);
+
+      const linkQuery = `SELECT Id, ContentDocumentId, LinkedEntityId, ShareType, Visibility
+                         FROM ContentDocumentLink
+                         WHERE ContentDocumentId IN ('${documentIds.join("','")}')`;
+
+      const linkResult = await this.soqlQuery(linkQuery);
+
+      console.log('[HealthCheckAPI] Found', linkResult.totalSize, 'ContentDocumentLink records');
+
+      // Step 4: Organize results by file
+      versionResult.records.forEach(version => {
+        const fileType = version.Id === pdfId ? 'PDF' : 'FILE';
+        const links = linkResult.records.filter(link => link.ContentDocumentId === version.ContentDocumentId);
+
+        fileDetails.push({
+          type: fileType,
+          versionId: version.Id,
+          documentId: version.ContentDocumentId,
+          title: version.Title,
+          shareCount: links.length,
+          shares: links.map(link => ({
+            linkedEntityId: link.LinkedEntityId,
+            shareType: link.ShareType,
+            visibility: link.Visibility
+          }))
+        });
+      });
+
+      // Step 5: Generate summary
+      const totalShares = fileDetails.reduce((sum, file) => sum + file.shareCount, 0);
+      const pdfFile = fileDetails.find(f => f.type === 'PDF');
+      const docFile = fileDetails.find(f => f.type === 'FILE');
+
+      let summary = `Found ${totalShares} share record(s): `;
+      if (pdfFile) summary += `PDF has ${pdfFile.shareCount} share(s)`;
+      if (pdfFile && docFile) summary += ', ';
+      if (docFile) summary += `FILE has ${docFile.shareCount} share(s)`;
+
+      return {
+        status: 'success',
+        message: 'Share check completed successfully',
+        summary: summary,
+        data: {
+          revisionName: revision.Name,
+          revisionId: recordId,
+          files: fileDetails,
+          totalShares: totalShares
+        }
+      };
+
+    } catch (error) {
+      console.error('[HealthCheckAPI] Error checking document revision sharing:', error);
+      return {
+        status: 'error',
+        message: error.message || 'Unknown error occurred',
+        summary: `Error: ${error.message}`
+      };
+    }
+  }
+
+  /**
    * Run a single health check by name
    * @param {string} checkName - Name of the check to run
    * @param {object} customCheck - Custom check object (if checkName is 'custom')
