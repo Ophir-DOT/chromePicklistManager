@@ -130,6 +130,12 @@ main {
   margin-bottom: 20px;
 }
 
+.button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .action-button {
   display: flex;
   align-items: center;
@@ -560,4 +566,68 @@ footer {
   font-size: 12px;
   color: #666;
   font-weight: normal;
+}
+
+/* Import Dependencies Section */
+.import-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #ddd;
+}
+
+.import-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 10px;
+  border: 2px dashed #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+  margin: 12px 0;
+  transition: all 0.2s;
+}
+
+.file-input:hover {
+  border-color: #0176d3;
+  background: #f9f9f9;
+}
+
+.preview-object {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border-left: 3px solid #0176d3;
+}
+
+.preview-object strong {
+  color: #0176d3;
+}
+
+.preview-object ul {
+  margin-top: 8px;
+  padding-left: 20px;
+}
+
+.preview-object li {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.warning-text {
+  margin-top: 12px;
+  padding: 10px;
+  background: #fff4e6;
+  border: 1px solid #ffa500;
+  border-radius: 4px;
+  color: #b35900;
+  font-size: 12px;
 }

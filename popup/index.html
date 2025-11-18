@@ -33,19 +33,35 @@
       <!-- Main Menu View -->
       <div id="mainView">
         <section class="quick-actions">
-          <button id="exportBtn" class="action-button">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
-            </svg>
-            Export Picklists
-          </button>
+          <div class="button-grid">
+            <button id="exportBtn" class="action-button">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+              </svg>
+              Export Picklists
+            </button>
 
-          <button id="exportDepsBtn" class="action-button">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L2 7v10c0 5.5 4 10.6 10 12 6-1.4 10-6.5 10-12V7l-10-5zm0 10l-5 3V9l5-3 5 3v6l-5-3z"/>
-            </svg>
-            Export Dependencies
-          </button>
+            <button id="exportDepsBtn" class="action-button">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7v10c0 5.5 4 10.6 10 12 6-1.4 10-6.5 10-12V7l-10-5zm0 10l-5 3V9l5-3 5 3v6l-5-3z"/>
+              </svg>
+              Export Dependencies
+            </button>
+
+            <button id="picklistLoaderBtn" class="action-button">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              Picklist Loader
+            </button>
+
+            <button id="dependencyLoaderBtn" class="action-button">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 16.17l9.17-9.17 1.41 1.42L6.41 17.59 5 16.17zm14-8.34L10.83 16 9.41 14.59 17.59 6.41 19 7.83zM12 2L2 7v10c0 5.5 4 10.6 10 12 6-1.4 10-6.5 10-12V7l-10-5z"/>
+              </svg>
+              Dependency Loader
+            </button>
+          </div>
 
           <button id="compareBtn" class="action-button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -54,11 +70,18 @@
             Compare Orgs
           </button>
 
-          <button id="deployBtn" class="action-button">
+          <button id="healthCheckBtn" class="action-button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
-            Deploy Changes
+            DOT Health Check
+          </button>
+
+          <button id="settingsBtn" class="action-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+            Settings
           </button>
         </section>
 
@@ -139,6 +162,42 @@
         </div>
       </div>
 
+      <!-- Dependency Loader View -->
+      <div id="dependencyLoaderView" class="hidden">
+        <div class="view-header">
+          <button id="backFromDependencyLoaderBtn" class="back-button">← Back</button>
+          <h2>Dependency Loader</h2>
+        </div>
+
+        <div class="export-content">
+          <div class="import-section">
+            <h3>Import Dependencies</h3>
+            <p class="help-text">Upload a CSV file with the same format as the export to update field dependencies and record type picklist values.</p>
+            <input type="file" id="depsFileInput" accept=".csv" class="file-input" />
+
+            <div class="form-section">
+              <div class="help-text">
+                <strong>Note:</strong> CSV dependencies will be merged with existing dependencies (append mode only).<br>
+                Due to Salesforce API limitations, existing dependencies cannot be removed - only new ones can be added.<br>
+                Picklist values remain unchanged.
+              </div>
+            </div>
+
+            <button id="importDepsBtn" class="primary-button" disabled>
+              Preview & Deploy Dependencies
+            </button>
+            <div id="importDepsPreview" class="preview-area hidden">
+              <h3>Preview Changes</h3>
+              <div id="importDepsPreviewContent"></div>
+              <button id="deployDepsBtn" class="primary-button">
+                Download Package & Deploy
+              </button>
+            </div>
+            <div id="importDepsStatus" class="status-message"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Update Picklist View -->
       <div id="updatePicklistView" class="hidden">
         <div class="view-header">
@@ -195,7 +254,7 @@
     </main>
 
     <footer>
-      <small>v1.0.0</small>
+      <small>v1.1.0</small>
     </footer>
   </div>
 

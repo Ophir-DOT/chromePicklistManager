@@ -326,7 +326,15 @@ class MetadataAPI {
 
       if (field.values && field.values.length > 0) {
         xml += `
-        <valueSet>
+        <valueSet>`;
+
+        // Add controlling field if present (for field dependencies)
+        if (field.controllingField) {
+          xml += `
+            <controllingField>${this.escapeXml(field.controllingField)}</controllingField>`;
+        }
+
+        xml += `
             <valueSetDefinition>
                 <sorted>false</sorted>`;
 
@@ -340,7 +348,20 @@ class MetadataAPI {
         });
 
         xml += `
-            </valueSetDefinition>
+            </valueSetDefinition>`;
+
+        // Add value settings for field dependencies
+        if (field.valueSettings && field.valueSettings.length > 0) {
+          field.valueSettings.forEach(vs => {
+            xml += `
+            <valueSettings>
+                <controllingFieldValue>${this.escapeXml(vs.controllingFieldValue)}</controllingFieldValue>
+                <valueName>${this.escapeXml(vs.valueName)}</valueName>
+            </valueSettings>`;
+          });
+        }
+
+        xml += `
         </valueSet>`;
       }
 
