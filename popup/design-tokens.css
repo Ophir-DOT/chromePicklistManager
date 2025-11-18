@@ -1,0 +1,132 @@
+/**
+ * Dot Compliance Design Tokens
+ * Based on Dot Compliance Brand Book (2025)
+ *
+ * This file defines CSS custom properties (variables) for consistent
+ * application of the Dot Compliance brand across all UI components.
+ */
+
+:root {
+  /* ============================================
+     COLOR PALETTE
+     ============================================ */
+
+  /* Primary & Secondary Colors */
+  --brand-color-primary: #270648;        /* Deep Purple 500 - Backgrounds, dark text, primary buttons */
+  --brand-color-secondary: #7D32C7;      /* Purple 300 - Wordmark, headings, accents */
+  --brand-color-cta: #DD0087;            /* Pink 500 - Calls to Action, links, icons */
+
+  /* Pink Variants */
+  --brand-color-link-bg: #FFE1FB;        /* Pink 100 - Subtle accents, light link backgrounds */
+
+  /* Gray-Purple Variants */
+  --brand-color-neutral-med: #ABA1B5;    /* Gray-Purple 300 - Supporting text, inactive states, borders */
+  --brand-color-neutral-light: #F5F3FB;  /* Gray-Purple 20 - Light backgrounds, separation layers */
+
+  /* Text Colors */
+  --brand-color-text-dark: #270646;      /* Black 500 - Standard body text */
+  --brand-color-text-light: #FFFFFF;     /* White - Text on dark backgrounds */
+
+  /* Accent Colors (Product-Specific, use sparingly) */
+  --brand-color-accent-blue: #54C3F4;    /* Blue 400 - Infographics, highlights */
+  --brand-color-accent-green: #5EDBBB;   /* Green 400 - Success states, positive indicators */
+  --brand-color-accent-gold: #FFBB60;    /* Gold 400 - Warnings, highlights */
+
+  /* Semantic Colors (derived from brand palette) */
+  --color-success: #5EDBBB;              /* Green 400 */
+  --color-success-bg: #e8f7ed;
+  --color-success-text: #2d6e45;
+
+  --color-error: #c23934;                /* Keep existing for consistency */
+  --color-error-bg: #fde8e8;
+  --color-error-text: #8b2723;
+
+  --color-info: #54C3F4;                 /* Blue 400 */
+  --color-info-bg: #e8f4fd;
+  --color-info-text: #014486;
+
+  --color-warning: #FFBB60;              /* Gold 400 */
+  --color-warning-bg: #fff4e6;
+  --color-warning-text: #b35900;
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+
+  /* Font Families */
+  --font-family-headline: 'Quicksand', 'Helvetica Neue', sans-serif;
+  --font-family-body: 'PT Serif', Georgia, serif;
+  --font-family-mono: 'Courier New', monospace;
+
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.8125rem;  /* 13px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.5rem;     /* 24px */
+  --font-size-2xl: 2rem;      /* 32px */
+  --font-size-3xl: 2.5rem;    /* 40px */
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.4;
+  --line-height-relaxed: 1.6;
+
+  /* ============================================
+     SPACING (8px base unit)
+     ============================================ */
+
+  --spacing-xs: 0.5rem;   /* 8px - Small padding, tight gaps */
+  --spacing-sm: 0.75rem;  /* 12px - Compact spacing */
+  --spacing-md: 1rem;     /* 16px - Standard padding, paragraph spacing */
+  --spacing-lg: 1.5rem;   /* 24px - Section spacing */
+  --spacing-xl: 2rem;     /* 32px - Outer perimeter, major sections */
+  --spacing-2xl: 2.5rem;  /* 40px - Large section breaks */
+  --spacing-3xl: 3rem;    /* 48px - Page-level spacing */
+
+  /* ============================================
+     BORDERS & RADIUS
+     ============================================ */
+
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-pill: 50%;
+
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 3px;
+
+  /* ============================================
+     SHADOWS
+     ============================================ */
+
+  --shadow-sm: 0 1px 2px rgba(39, 6, 72, 0.1);
+  --shadow-md: 0 2px 8px rgba(39, 6, 72, 0.12);
+  --shadow-lg: 0 4px 16px rgba(39, 6, 72, 0.15);
+
+  /* ============================================
+     TRANSITIONS
+     ============================================ */
+
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ============================================
+     Z-INDEX LAYERS
+     ============================================ */
+
+  --z-base: 1;
+  --z-dropdown: 10;
+  --z-sticky: 50;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-tooltip: 300;
+}
