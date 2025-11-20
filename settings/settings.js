@@ -16,6 +16,7 @@ class HealthCheckSettings {
     await this.checkUpdateStatus();
     await this.loadKeyboardShortcuts();
     await this.initTheme();
+    await this.loadSessionInfo();
   }
 
   setupEventListeners() {
@@ -41,6 +42,21 @@ class HealthCheckSettings {
         chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
       });
     });
+
+    // Session info buttons
+    const refreshSessionBtn = document.getElementById('refreshSessionBtn');
+    if (refreshSessionBtn) {
+      refreshSessionBtn.addEventListener('click', () => {
+        this.loadSessionInfo();
+      });
+    }
+
+    const copySessionIdBtn = document.getElementById('copySessionIdBtn');
+    if (copySessionIdBtn) {
+      copySessionIdBtn.addEventListener('click', () => {
+        this.copySessionId();
+      });
+    }
 
     // Theme option change handlers
     document.querySelectorAll('input[name="theme"]').forEach(radio => {
@@ -546,6 +562,127 @@ class HealthCheckSettings {
     if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
     return `${Math.floor(seconds / 86400)} days ago`;
+  }
+
+  // ============================================================================
+  // SESSION INFO
+  // ============================================================================
+
+  async loadSessionInfo() {
+    const instanceUrlEl = document.getElementById('sessionInstanceUrl');
+    const sessionIdEl = document.getElementById('sessionId');
+    const sessionStatusEl = document.getElementById('sessionStatus');
+    const copyBtn = document.getElementById('copySessionIdBtn');
+
+    try {
+      // Update status to loading
+      sessionStatusEl.textContent = 'Checking...';
+      sessionStatusEl.className = 'session-status';
+
+      // First, try to find an active Salesforce tab to extract session from
+      // Prefer the most recently active SF tab
+      const tabs = await chrome.tabs.query({});
+      const sfTabs = tabs.filter(tab =>
+        tab.url &&
+        (tab.url.includes('salesforce.com') || tab.url.includes('force.com')) &&
+        !tab.url.startsWith('chrome-extension://')
+      );
+
+      // Sort by lastAccessed (most recent first), fallback to active tab
+      sfTabs.sort((a, b) => {
+        // Prefer active tab
+        if (a.active && !b.active) return -1;
+        if (b.active && !a.active) return 1;
+        // Then by lastAccessed
+        return (b.lastAccessed || 0) - (a.lastAccessed || 0);
+      });
+
+      const sfTab = sfTabs[0];
+
+      // Request session from background worker
+      const request = { action: 'GET_SESSION' };
+      if (sfTab) {
+        request.tabId = sfTab.id;
+      }
+
+      const response = await chrome.runtime.sendMessage(request);
+
+      if (response && response.success && response.data) {
+        const session = response.data;
+
+        // Display instance URL
+        instanceUrlEl.innerHTML = `<a href="${session.instanceUrl}" target="_blank">${session.instanceUrl}</a>`;
+
+        // Display session ID (truncated for display, full value for copy)
+        const fullSessionId = session.sessionId;
+        const truncatedId = fullSessionId.length > 50
+          ? fullSessionId.substring(0, 25) + '...' + fullSessionId.substring(fullSessionId.length - 20)
+          : fullSessionId;
+
+        sessionIdEl.textContent = truncatedId;
+        sessionIdEl.setAttribute('data-full-id', fullSessionId);
+        sessionIdEl.title = 'Click copy button to copy full Session ID';
+
+        // Show copy button
+        copyBtn.style.display = 'inline-flex';
+
+        // Update status
+        sessionStatusEl.textContent = 'Connected';
+        sessionStatusEl.className = 'session-status connected';
+
+        console.log('[Settings] Session loaded successfully');
+      } else {
+        // No session found
+        instanceUrlEl.innerHTML = '<span class="no-session">Not connected</span>';
+        sessionIdEl.textContent = 'Not connected';
+        sessionIdEl.removeAttribute('data-full-id');
+        copyBtn.style.display = 'none';
+        sessionStatusEl.textContent = 'No active Salesforce session';
+        sessionStatusEl.className = 'session-status disconnected';
+
+        console.log('[Settings] No session found:', response?.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('[Settings] Error loading session info:', error);
+      instanceUrlEl.innerHTML = '<span class="no-session">Error</span>';
+      sessionIdEl.textContent = 'Error loading session';
+      sessionIdEl.removeAttribute('data-full-id');
+      copyBtn.style.display = 'none';
+      sessionStatusEl.textContent = 'Error checking session';
+      sessionStatusEl.className = 'session-status error';
+    }
+  }
+
+  async copySessionId() {
+    const sessionIdEl = document.getElementById('sessionId');
+    const fullSessionId = sessionIdEl.getAttribute('data-full-id');
+
+    if (!fullSessionId) {
+      alert('No session ID to copy');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(fullSessionId);
+
+      // Show feedback
+      const copyBtn = document.getElementById('copySessionIdBtn');
+      const icon = copyBtn.querySelector('.material-symbols-rounded');
+      const originalText = icon.textContent;
+
+      icon.textContent = 'check';
+      copyBtn.classList.add('copied');
+
+      setTimeout(() => {
+        icon.textContent = originalText;
+        copyBtn.classList.remove('copied');
+      }, 2000);
+
+      console.log('[Settings] Session ID copied to clipboard');
+    } catch (error) {
+      console.error('[Settings] Error copying session ID:', error);
+      alert('Failed to copy session ID');
+    }
   }
 }
 

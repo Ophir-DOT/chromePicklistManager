@@ -89,11 +89,13 @@ function setupEventListeners() {
   document.getElementById('exportDepsBtn').addEventListener('click', showExportDepsView);
   document.getElementById('picklistLoaderBtn').addEventListener('click', showPicklistLoader);
   document.getElementById('dependencyLoaderBtn').addEventListener('click', showDependencyLoader);
-  document.getElementById('compareBtn').addEventListener('click', handleCompare);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
   document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
   document.getElementById('batchJobMonitorBtn').addEventListener('click', handleBatchJobMonitor);
   document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
+  document.getElementById('permissionComparisonBtn').addEventListener('click', handlePermissionComparison);
+  document.getElementById('orgCompareBtn').addEventListener('click', handleOrgCompare);
+  document.getElementById('exportFieldsBtn').addEventListener('click', handleExportFields);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
   // Export view buttons
@@ -451,10 +453,6 @@ function downloadZipFile(zipBlob, filename) {
   console.log('[Popup] ZIP package downloaded:', filename);
 }
 
-async function handleCompare() {
-  alert('Compare functionality: Upload two exports to compare them.\n\nFor full compare features, use the sidepanel interface.');
-}
-
 async function showPicklistLoader() {
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('updatePicklistView').classList.remove('hidden');
@@ -462,6 +460,29 @@ async function showPicklistLoader() {
 }
 
 async function showDependencyLoader() {
+  // Check if Dependency Loader is unlocked
+  const isUnlocked = await checkDependencyLoaderUnlock();
+
+  if (!isUnlocked) {
+    // Prompt for password
+    const password = prompt('Dependency Loader is locked.\n\nThis feature is experimental and not fully validated.\nEnter the unlock key to continue:');
+
+    if (!password) {
+      return; // User cancelled
+    }
+
+    // Validate password (simple hash check)
+    const validPassword = await validateDependencyLoaderPassword(password);
+
+    if (!validPassword) {
+      alert('Invalid unlock key. Access denied.');
+      return;
+    }
+
+    // Store unlock state for this session
+    await chrome.storage.session.set({ dependencyLoaderUnlocked: true });
+  }
+
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('dependencyLoaderView').classList.remove('hidden');
 
@@ -472,6 +493,23 @@ async function showDependencyLoader() {
   document.getElementById('importDepsPreview').classList.add('hidden');
   document.getElementById('importDepsStatus').textContent = '';
   document.getElementById('importDepsStatus').className = 'status-message';
+}
+
+async function checkDependencyLoaderUnlock() {
+  try {
+    const result = await chrome.storage.session.get('dependencyLoaderUnlocked');
+    return result.dependencyLoaderUnlocked === true;
+  } catch (error) {
+    console.error('[Popup] Error checking dependency loader unlock:', error);
+    return false;
+  }
+}
+
+async function validateDependencyLoaderPassword(password) {
+  // Simple password validation
+  // The unlock key is "DOT-DEPS-2024" (can be changed)
+  const validKey = 'DOT-DEPS-2024';
+  return password === validKey;
 }
 
 // ============================================================================
@@ -1799,6 +1837,54 @@ function handleValidationRules() {
   } catch (error) {
     console.error('[Popup] Failed to open Validation Rules Manager:', error);
     alert(`Failed to open Validation Rules Manager: ${error.message}`);
+  }
+}
+
+function handlePermissionComparison() {
+  try {
+    console.log('[Popup] Opening Permission Comparison...');
+
+    const permissionComparisonUrl = chrome.runtime.getURL('permissions/permissions.html');
+
+    chrome.tabs.create({ url: permissionComparisonUrl }, (tab) => {
+      console.log('[Popup] Permission Comparison opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Permission Comparison:', error);
+    alert(`Failed to open Permission Comparison: ${error.message}`);
+  }
+}
+
+function handleOrgCompare() {
+  try {
+    console.log('[Popup] Opening Org Compare Tool...');
+
+    const orgCompareUrl = chrome.runtime.getURL('org-compare/org-compare.html');
+
+    chrome.tabs.create({ url: orgCompareUrl }, (tab) => {
+      console.log('[Popup] Org Compare Tool opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Org Compare Tool:', error);
+    alert(`Failed to open Org Compare Tool: ${error.message}`);
+  }
+}
+
+function handleExportFields() {
+  try {
+    console.log('[Popup] Opening Export Fields...');
+
+    const exportFieldsUrl = chrome.runtime.getURL('export-fields/export-fields.html');
+
+    chrome.tabs.create({ url: exportFieldsUrl }, (tab) => {
+      console.log('[Popup] Export Fields opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Export Fields:', error);
+    alert(`Failed to open Export Fields: ${error.message}`);
   }
 }
 

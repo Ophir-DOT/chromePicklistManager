@@ -5,32 +5,79 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 1.5.0
+## [1.5.0] - 2025-11-20
 
 ### Focus: Advanced Administration & Security Features
 
-### Planned
-- **Profile/Permission Set Comparison & Import**: Security and compliance tool
-  - Compare field-level security across profiles/permission sets
-  - Identify permission gaps or over-privileges
-  - Export object/field permissions matrix
-  - Import permission exports from another environment
-  - Bulk permission updates for specific fields
-  - Track changes over time
-  - Map profiles/permission sets between source and target environments
-  - Preview permission changes before deployment
-  - Selective import (choose which permissions to apply)
-
-- **Org Compare Tool**: Configuration drift detection and sync
-  - Side-by-side object comparison (fields, validation rules, etc.)
-  - Configuration drift detection between environments
-  - Sync wizard to align configurations
-  - Pre-migration verification
-  - Compare picklists, workflows, validation rules
-  - Export comparison reports
-  - Highlight differences with visual diff
-
 ### Added
+- **Export Fields**: Comprehensive field metadata export tool
+  - Export field definitions from any Salesforce objects to CSV or JSON
+  - Multi-object selection with searchable dropdown
+  - Filter by field type (Text, Number, Date, Picklist, Lookup, Checkbox, etc.)
+  - Filter by field category (Custom only, Standard only, or All)
+  - Field preview table with sortable columns (Object, Label, API Name, Type, Required, Custom)
+  - Pagination for handling large field sets
+  - Select/deselect individual fields for export
+  - Comprehensive field properties exported:
+    - Label, API Name, Data Type, Length, Precision, Scale
+    - Required (nillable), Unique, External ID
+    - Default Value, Formula
+    - Picklist Values (for picklist fields)
+    - Reference To, Relationship Name, Relationship Type (for lookups)
+    - Inline Help Text, Description
+    - Created Date, Last Modified Date (optional via Tooling API)
+  - Summary statistics (Total fields, Custom, Standard, Required)
+  - Progress indicator for bulk exports
+  - CSV export with BOM for Excel compatibility
+  - Full dark mode support
+  - Added "Export Fields" button in Advanced Tools section
+  - Added `background/export-fields-api.js` for REST API describe calls
+  - Added `export-fields/` directory with HTML, CSS, JS files
+
+
+- **Org Compare Tool**: Configuration drift detection and metadata comparison between Salesforce orgs
+  - **Multi-session detection**: Scans ALL active Chrome tabs for Salesforce sessions
+  - Supports users with more than 2 simultaneous Salesforce environments
+  - Select any two orgs from all detected sessions for comparison
+  - Compare 6 metadata types:
+    - Objects (custom fields, relationships, queryable status)
+    - Fields (type, length, required, unique, custom)
+    - Validation Rules (formulas, active status, error messages)
+    - Flows (active/inactive, versions, process types)
+    - Picklists (values, labels, default values)
+    - Dependencies (controlling/dependent field relationships)
+  - Side-by-side comparison view with color-coded status:
+    - Green: Items that match between orgs
+    - Yellow: Items that exist in both but have differences
+    - Blue: Items only in source org
+    - Pink: Items only in target org
+  - Summary statistics dashboard (total items, matches, differences, source-only, target-only)
+  - Filter results by status, metadata type, and search term
+  - Collapsible sections for each metadata type
+  - Export comparison results to CSV or JSON format
+  - Full dark mode support
+  - Added "Org Compare Tool" button in Advanced Tools section
+  - Added `background/org-compare-api.js` for session detection and metadata comparison
+  - Added `org-compare/` directory with HTML, CSS, JS files
+
+- **Permission Comparison**: Security and compliance tool for comparing permissions across Profiles and Permission Sets
+  - View all Profiles and Permission Sets with summary statistics
+  - Load and view object permissions (Create, Read, Edit, Delete, View All, Modify All)
+  - Load and view field permissions (Read, Edit)
+  - Side-by-side comparison of two Profiles/Permission Sets
+  - Visual diff display with color-coded status (Match, Different, Source Only, Target Only)
+  - Filter comparison results by status, object name, and permission type
+  - Summary statistics showing matching, different, and unique permissions
+  - Export permissions to CSV or JSON format
+  - Export comparison results to CSV
+  - Import preview for permission data (CSV/JSON) - preview only, no deployment
+  - Multi-select export with separate object and field permission files
+  - Search and filter by object name in all views
+  - Full dark mode support
+  - Added "Permission Comparison" button in Advanced Tools section
+  - Added `background/permissions-api.js` for Tooling API queries (Profile, PermissionSet, FieldPermissions, ObjectPermissions)
+  - Added `permissions/` directory with HTML, CSS, JS files
+
 - **Validation Rules Manager**: Comprehensive tool for managing Salesforce validation rules
   - View all validation rules across all objects with summary statistics
   - Filter by object, status (active/inactive), and search by name/formula/error message
@@ -76,6 +123,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated popup menu with "Advanced Tools" section for new features
 - Moved "Check Share Files" button to Advanced Tools section
 - Added section divider styling with dark mode support
+- **Dependency Loader**: Now password-protected (experimental feature)
+  - Lock icon displayed on button to indicate restricted access
+  - Requires unlock key "DOT-DEPS-2024" to access
+  - Session-based unlock (stays unlocked until browser restart)
+  - Warning message indicates feature is experimental and not fully validated
+
+### Improved
+- **Health Check Report**: Click-to-copy for incorrect values
+  - When a health check field shows an incorrect value, click on it to copy the expected/correct value to clipboard
+  - Visual feedback with copy icon on hover and "Copied!" confirmation
+  - Tooltip shows the correct value before clicking
+  - Works in both light and dark mode
 
 ### Technical
 - Added `background/batch-job-api.js` for AsyncApexJob queries via Tooling API
@@ -85,6 +144,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `.section-divider` CSS class for popup menu organization
 - Updated design-tokens.css with dark mode color variables
 - ThemeManager module with system preference detection via `prefers-color-scheme`
+
+### Testing
+- **Playwright E2E Testing Framework**: Complete testing infrastructure for Chrome extension
+  - Playwright configuration for Chrome-only testing with extension loading
+  - Test fixtures for extension context and page helpers
+  - E2E tests for all major features:
+    - Popup UI and navigation tests
+    - Settings page and theme switching tests
+    - Health Check page tests
+    - Batch Job Monitor tests
+    - Validation Rules Manager tests
+  - MCP server configuration for Playwright integration
+  - npm scripts: `test`, `test:ui`, `test:headed`, `test:debug`, `test:report`
 
 ---
 

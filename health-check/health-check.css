@@ -375,6 +375,55 @@ body {
   font-weight: 500;
 }
 
+/* Copyable field values */
+.field-value.copyable {
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 2px 6px;
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.2s ease;
+}
+
+.field-value.copyable:hover {
+  background-color: var(--color-error-bg);
+}
+
+.field-value.copyable .copy-icon {
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--color-error);
+}
+
+.field-value.copyable:hover .copy-icon {
+  opacity: 1;
+}
+
+.field-value.copyable .copy-feedback {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-success);
+  color: white;
+  padding: 4px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  margin-right: 8px;
+}
+
+.field-value.copyable .copy-feedback.show {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* ============================================
    ERROR MESSAGE
    ============================================ */
@@ -677,4 +726,13 @@ body {
     var(--brand-color-bg-tertiary) 50%,
     var(--brand-color-bg-primary) 75%
   );
+}
+
+/* Copyable field values */
+[data-theme="dark"] .field-value.copyable:hover {
+  background-color: rgba(var(--color-error-rgb, 220, 53, 69), 0.15);
+}
+
+[data-theme="dark"] .field-value.copyable .copy-feedback {
+  background: var(--color-success);
 }

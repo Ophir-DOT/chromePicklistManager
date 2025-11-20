@@ -36,6 +36,55 @@
       </button>
     </div>
 
+    <!-- Session Info Section -->
+    <section class="session-section">
+      <header class="section-header">
+        <div>
+          <h2>Session Information</h2>
+          <p class="subtitle">Current Salesforce connection details</p>
+        </div>
+        <button id="refreshSessionBtn" class="btn btn-secondary btn-small">
+          <span class="material-symbols-rounded">refresh</span>
+          Refresh
+        </button>
+      </header>
+
+      <div class="session-info-container">
+        <div class="session-item">
+          <div class="session-label">
+            <span class="material-symbols-rounded">link</span>
+            Instance URL
+          </div>
+          <div class="session-value" id="sessionInstanceUrl">
+            <span class="no-session">Not connected</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-label">
+            <span class="material-symbols-rounded">key</span>
+            Session ID
+          </div>
+          <div class="session-value session-id-container">
+            <code id="sessionId" class="session-id">Not connected</code>
+            <button id="copySessionIdBtn" class="btn-icon copy-btn" title="Copy Session ID" style="display: none;">
+              <span class="material-symbols-rounded">content_copy</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-label">
+            <span class="material-symbols-rounded">schedule</span>
+            Status
+          </div>
+          <div class="session-value">
+            <span id="sessionStatus" class="session-status">Checking...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Theme Section -->
     <section class="theme-section">
       <header class="section-header">

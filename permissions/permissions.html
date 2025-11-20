@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Permission Comparison - DOT Toolkit</title>
+  <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="../popup/design-tokens.css">
+  <link rel="stylesheet" href="permissions.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="header-content">
+        <h1>
+          <span class="material-symbols-rounded">admin_panel_settings</span>
+          Permission Comparison
+        </h1>
+        <div class="header-actions">
+          <button id="refreshBtn" class="btn btn-icon" title="Refresh">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+          <button id="exportBtn" class="btn btn-icon" title="Export">
+            <span class="material-symbols-rounded">download</span>
+          </button>
+        </div>
+      </div>
+      <div class="org-info">
+        <strong>Org:</strong> <span id="orgUrl">Loading...</span>
+      </div>
+    </header>
+
+    <!-- Summary Stats -->
+    <div class="summary-section">
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon profiles">badge</span>
+        <div class="stat-content">
+          <span class="stat-value" id="profileCount">-</span>
+          <span class="stat-label">Profiles</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon permission-sets">lock_open</span>
+        <div class="stat-content">
+          <span class="stat-value" id="permSetCount">-</span>
+          <span class="stat-label">Permission Sets</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon objects">category</span>
+        <div class="stat-content">
+          <span class="stat-value" id="objectPermCount">-</span>
+          <span class="stat-label">Object Perms</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon fields">list</span>
+        <div class="stat-content">
+          <span class="stat-value" id="fieldPermCount">-</span>
+          <span class="stat-label">Field Perms</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="list">
+        <span class="material-symbols-rounded">list</span>
+        Permission List
+      </button>
+      <button class="tab-btn" data-tab="compare">
+        <span class="material-symbols-rounded">compare</span>
+        Comparison
+      </button>
+      <button class="tab-btn" data-tab="import">
+        <span class="material-symbols-rounded">upload_file</span>
+        Import Preview
+      </button>
+      <button class="tab-btn" data-tab="export">
+        <span class="material-symbols-rounded">download</span>
+        Export
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Permission List Tab -->
+      <div id="listTab" class="tab-panel active">
+        <div class="list-controls">
+          <div class="selector-group">
+            <label for="listTypeSelect">Select Type:</label>
+            <select id="listTypeSelect">
+              <option value="profiles">Profiles</option>
+              <option value="permissionSets">Permission Sets</option>
+            </select>
+          </div>
+          <div class="selector-group">
+            <label for="listItemSelect">Select Item:</label>
+            <select id="listItemSelect">
+              <option value="">-- Select --</option>
+            </select>
+          </div>
+          <button id="loadPermissionsBtn" class="btn btn-primary" disabled>
+            <span class="material-symbols-rounded">visibility</span>
+            Load Permissions
+          </button>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-group">
+            <label for="objectFilter">Filter by Object:</label>
+            <input type="text" id="objectFilter" placeholder="Search objects...">
+          </div>
+          <div class="filter-group">
+            <label for="permTypeFilter">Permission Type:</label>
+            <select id="permTypeFilter">
+              <option value="object">Object Permissions</option>
+              <option value="field">Field Permissions</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="permissionsListContainer" class="permissions-list-container">
+          <div class="empty-state">
+            <span class="material-symbols-rounded">admin_panel_settings</span>
+            <p>Select a Profile or Permission Set to view permissions</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparison Tab -->
+      <div id="compareTab" class="tab-panel hidden">
+        <div class="compare-selectors">
+          <div class="compare-selector">
+            <h3>Source</h3>
+            <div class="selector-group">
+              <label for="sourceType">Type:</label>
+              <select id="sourceType">
+                <option value="Profile">Profile</option>
+                <option value="PermissionSet">Permission Set</option>
+              </select>
+            </div>
+            <div class="selector-group">
+              <label for="sourceItem">Select:</label>
+              <select id="sourceItem">
+                <option value="">-- Select --</option>
+              </select>
+            </div>
+          </div>
+          <div class="compare-arrow">
+            <span class="material-symbols-rounded">compare_arrows</span>
+          </div>
+          <div class="compare-selector">
+            <h3>Target</h3>
+            <div class="selector-group">
+              <label for="targetType">Type:</label>
+              <select id="targetType">
+                <option value="Profile">Profile</option>
+                <option value="PermissionSet">Permission Set</option>
+              </select>
+            </div>
+            <div class="selector-group">
+              <label for="targetItem">Select:</label>
+              <select id="targetItem">
+                <option value="">-- Select --</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-actions">
+          <button id="compareBtn" class="btn btn-primary" disabled>
+            <span class="material-symbols-rounded">compare</span>
+            Compare Permissions
+          </button>
+          <button id="exportComparisonBtn" class="btn btn-secondary" disabled>
+            <span class="material-symbols-rounded">download</span>
+            Export Comparison
+          </button>
+        </div>
+
+        <!-- Comparison Filter -->
+        <div id="comparisonFilterSection" class="filter-section hidden">
+          <div class="filter-group">
+            <label for="comparisonObjectFilter">Filter by Object:</label>
+            <input type="text" id="comparisonObjectFilter" placeholder="Search objects...">
+          </div>
+          <div class="filter-group">
+            <label for="comparisonTypeFilter">Show:</label>
+            <select id="comparisonTypeFilter">
+              <option value="all">All</option>
+              <option value="different">Different Only</option>
+              <option value="matching">Matching Only</option>
+              <option value="sourceOnly">Source Only</option>
+              <option value="targetOnly">Target Only</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="comparisonPermType">Permission Type:</label>
+            <select id="comparisonPermType">
+              <option value="object">Object Permissions</option>
+              <option value="field">Field Permissions</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Comparison Summary -->
+        <div id="comparisonSummary" class="comparison-summary hidden">
+          <div class="summary-item matching">
+            <span class="material-symbols-rounded">check_circle</span>
+            <span class="summary-count" id="matchingCount">0</span>
+            <span class="summary-label">Matching</span>
+          </div>
+          <div class="summary-item different">
+            <span class="material-symbols-rounded">difference</span>
+            <span class="summary-count" id="differentCount">0</span>
+            <span class="summary-label">Different</span>
+          </div>
+          <div class="summary-item source-only">
+            <span class="material-symbols-rounded">arrow_back</span>
+            <span class="summary-count" id="sourceOnlyCount">0</span>
+            <span class="summary-label">Source Only</span>
+          </div>
+          <div class="summary-item target-only">
+            <span class="material-symbols-rounded">arrow_forward</span>
+            <span class="summary-count" id="targetOnlyCount">0</span>
+            <span class="summary-label">Target Only</span>
+          </div>
+        </div>
+
+        <!-- Comparison Results -->
+        <div id="comparisonResults" class="comparison-results">
+          <div class="empty-state">
+            <span class="material-symbols-rounded">compare</span>
+            <p>Select source and target to compare permissions</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import Preview Tab -->
+      <div id="importTab" class="tab-panel hidden">
+        <div class="import-section">
+          <h3>Import Permission Data (Preview Only)</h3>
+          <p class="import-description">
+            Upload a CSV file to preview permission mappings. This feature is for analysis only - no changes will be deployed.
+          </p>
+
+          <div class="file-upload-area">
+            <input type="file" id="importFileInput" accept=".csv,.json" hidden>
+            <button id="uploadImportBtn" class="btn btn-secondary">
+              <span class="material-symbols-rounded">upload_file</span>
+              Select File
+            </button>
+            <span id="importFileName" class="file-name">No file selected</span>
+          </div>
+
+          <div id="importPreview" class="import-preview hidden">
+            <div class="import-summary">
+              <h4>Import Summary</h4>
+              <div id="importSummaryContent"></div>
+            </div>
+            <div class="import-data">
+              <h4>Preview Data</h4>
+              <div id="importDataContent" class="import-data-table"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Tab -->
+      <div id="exportTab" class="tab-panel hidden">
+        <div class="export-section">
+          <h3>Export Permissions</h3>
+          <p class="export-description">
+            Export permissions for selected Profiles and Permission Sets to CSV or JSON format.
+          </p>
+
+          <div class="export-options">
+            <div class="option-group">
+              <h4>Select Profiles</h4>
+              <div id="exportProfilesList" class="checkbox-list">
+                <!-- Populated dynamically -->
+              </div>
+              <div class="select-actions">
+                <button id="selectAllProfiles" class="btn btn-sm btn-secondary">Select All</button>
+                <button id="clearProfiles" class="btn btn-sm btn-secondary">Clear</button>
+              </div>
+            </div>
+
+            <div class="option-group">
+              <h4>Select Permission Sets</h4>
+              <div id="exportPermSetsList" class="checkbox-list">
+                <!-- Populated dynamically -->
+              </div>
+              <div class="select-actions">
+                <button id="selectAllPermSets" class="btn btn-sm btn-secondary">Select All</button>
+                <button id="clearPermSets" class="btn btn-sm btn-secondary">Clear</button>
+              </div>
+            </div>
+
+            <div class="option-group">
+              <h4>Export Options</h4>
+              <div class="export-format-options">
+                <label class="radio-label">
+                  <input type="radio" name="exportFormat" value="csv" checked>
+                  <span>CSV</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="exportFormat" value="json">
+                  <span>JSON</span>
+                </label>
+              </div>
+              <div class="export-type-options">
+                <label>
+                  <input type="checkbox" id="exportObjectPerms" checked>
+                  Object Permissions
+                </label>
+                <label>
+                  <input type="checkbox" id="exportFieldPerms" checked>
+                  Field Permissions
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="export-actions">
+            <button id="doExportBtn" class="btn btn-primary" disabled>
+              <span class="material-symbols-rounded">download</span>
+              Export Selected
+            </button>
+          </div>
+
+          <div id="exportStatus" class="status-message"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-content">
+      <span class="material-symbols-rounded spinning">sync</span>
+      <span id="loadingMessage">Loading...</span>
+    </div>
+  </div>
+
+  <script type="module" src="permissions.js"></script>
+</body>
+</html>

@@ -238,14 +238,34 @@ class ProgressiveHealthCheck {
     }
 
     let html = '';
-    result.fields.forEach(field => {
+    result.fields.forEach((field, index) => {
       const valueClass = field.match === true ? 'match' : (field.match === false ? 'no-match' : '');
-      html += `
-        <div class="field">
-          <div class="field-label">${this.escapeHtml(field.label)}</div>
-          <div class="field-value ${valueClass}">${this.escapeHtml(String(field.value))}</div>
-        </div>
-      `;
+      const hasCopyable = field.match === false && field.expected !== null && field.expected !== undefined;
+      const fieldId = `field-${result.name.replace(/\s+/g, '-')}-${index}`;
+
+      if (hasCopyable) {
+        // Clickable value with copy functionality
+        html += `
+          <div class="field">
+            <div class="field-label">${this.escapeHtml(field.label)}</div>
+            <div class="field-value ${valueClass} copyable"
+                 data-copy-value="${this.escapeHtml(String(field.expected))}"
+                 data-field-id="${fieldId}"
+                 title="Click to copy correct value: ${this.escapeHtml(String(field.expected))}">
+              ${this.escapeHtml(String(field.value))}
+              <span class="copy-icon material-symbols-rounded">content_copy</span>
+              <span class="copy-feedback" id="feedback-${fieldId}">Copied!</span>
+            </div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="field">
+            <div class="field-label">${this.escapeHtml(field.label)}</div>
+            <div class="field-value ${valueClass}">${this.escapeHtml(String(field.value))}</div>
+          </div>
+        `;
+      }
 
       // Add help text if present
       if (field.helpText) {
@@ -306,6 +326,39 @@ class ProgressiveHealthCheck {
     // Refresh
     document.getElementById('refreshBtn').addEventListener('click', () => {
       location.reload();
+    });
+
+    // Copy to clipboard for incorrect values
+    document.addEventListener('click', async (e) => {
+      const copyableElement = e.target.closest('.field-value.copyable');
+      if (copyableElement) {
+        const valueToCopy = copyableElement.dataset.copyValue;
+        const fieldId = copyableElement.dataset.fieldId;
+
+        try {
+          await navigator.clipboard.writeText(valueToCopy);
+
+          // Show feedback
+          const feedback = document.getElementById(`feedback-${fieldId}`);
+          if (feedback) {
+            feedback.classList.add('show');
+            setTimeout(() => {
+              feedback.classList.remove('show');
+            }, 2000);
+          }
+
+          console.log('[HealthCheck] Copied to clipboard:', valueToCopy);
+        } catch (error) {
+          console.error('[HealthCheck] Failed to copy to clipboard:', error);
+          // Fallback for older browsers
+          const textarea = document.createElement('textarea');
+          textarea.value = valueToCopy;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+      }
     });
   }
 

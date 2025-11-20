@@ -234,6 +234,23 @@ main {
   color: var(--brand-color-neutral-med);
 }
 
+/* Locked Feature Button */
+.action-button.locked-feature {
+  position: relative;
+}
+
+.action-button.locked-feature .lock-icon {
+  margin-left: auto;
+  font-size: 16px;
+  color: var(--brand-color-warning);
+  opacity: 0.8;
+}
+
+.action-button.locked-feature:hover .lock-icon {
+  color: var(--brand-color-cta);
+  opacity: 1;
+}
+
 /* Section Divider */
 .section-divider {
   display: flex;

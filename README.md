@@ -43,7 +43,76 @@ A Chrome extension for managing Salesforce picklist configurations, field depend
   - Picklist Loader: `Ctrl+Shift+L` (Mac: `Cmd+Shift+L`)
   - DOT Health Check: `Ctrl+Shift+H` (Mac: `Cmd+Shift+H`)
   - Check Share Files: `Ctrl+Shift+F` (Mac: `Cmd+Shift+F`)
-- **Compare Orgs**: Compare picklist configurations between different orgs
+- **Export Fields**: Comprehensive field metadata export tool
+  - Export field definitions from any Salesforce objects to CSV or JSON
+  - Multi-object selection with searchable dropdown
+  - Filter by field type (Text, Number, Date, Picklist, Lookup, Checkbox, etc.)
+  - Filter by field category (Custom only, Standard only, or All)
+  - Field preview table with sortable columns
+  - Pagination for handling large field sets
+  - Select/deselect individual fields for export
+  - Comprehensive field properties: Label, API Name, Type, Length, Required, Unique, External ID, Default Value, Formula, Picklist Values, Reference To, Inline Help Text, Description
+  - Summary statistics (Total fields, Custom, Standard, Required)
+  - Progress indicator for bulk exports
+  - CSV export with BOM for Excel compatibility
+  - Full dark mode support
+- **Org Compare Tool**: Configuration drift detection between Salesforce orgs
+  - **Multi-session support**: Detects ALL active Salesforce sessions across browser tabs
+  - Select any two orgs from all available sessions for comparison
+  - Compare 6 metadata types:
+    - Objects (custom fields, relationships)
+    - Fields (metadata, properties)
+    - Validation Rules (formulas, active status)
+    - Flows (active/inactive, versions)
+    - Picklists (values, default values)
+    - Dependencies (field dependencies)
+  - Side-by-side comparison view with color-coded differences:
+    - Green: Match
+    - Yellow: Different
+    - Blue: Source only
+    - Pink: Target only
+  - Summary statistics (total items, matches, differences)
+  - Filter and search results
+  - Export to CSV or JSON
+  - Full dark mode support
+- **Permission Comparison**: Security and compliance tool for Profile/Permission Set analysis
+  - View all Profiles and Permission Sets with summary statistics
+  - Load and view object permissions (CRUD, View All, Modify All)
+  - Load and view field permissions (Read, Edit)
+  - Side-by-side comparison with visual diff display
+  - Color-coded status: Match (green), Different (yellow), Source/Target Only
+  - Filter by status, object name, and permission type
+  - Export permissions to CSV or JSON format
+  - Export comparison results to CSV
+  - Import preview for permission data (preview only, no deployment)
+  - Full dark mode support
+- **Validation Rules Manager**: Comprehensive validation rule management
+  - View all validation rules across all objects
+  - Filter by object, status (active/inactive), search by name/formula/error message
+  - Bulk enable/disable validation rules (useful during migrations)
+  - Export to CSV or JSON format
+  - View detailed rule information (formula, error message, referenced fields)
+  - Analysis tab with object coverage and warnings
+  - Test validation rules against sample CSV data
+  - Full dark mode support
+- **Batch Job Monitor**: Real-time async operation monitoring
+  - View all running/queued AsyncApexJob records
+  - Three tabs: Active Jobs, Completed, Scheduled
+  - Summary stats dashboard (Active, Queued, Completed, Failed)
+  - Job progress bars with percentage and item counts
+  - Quick abort capability for running jobs
+  - Filter by job type and status
+  - Search by Apex class name
+  - Auto-refresh with configurable interval (15s, 30s, 1m, 2m, 5m)
+  - Browser notifications for job completion/failure
+  - Keyboard shortcut: `Ctrl+Shift+B` (Mac: `Cmd+Shift+B`)
+  - Full dark mode support
+- **Dark Mode Theme**: Dot Compliance branded dark mode
+  - Three theme options: Light, Dark, System (follows OS preference)
+  - Persistent user preference
+  - Real-time system theme change detection
+  - Maintains brand colors (Deep Purple, Pink) in both modes
+  - Applied to all pages: popup, settings, health-check, all advanced tools
 
 ## Installation
 
@@ -81,7 +150,8 @@ When extension shows "Update Available":
    - **Dependency Loader**: Import CSV and deploy field dependencies
    - **DOT Health Check**: Run org health validation
    - **Check Share Files**: Analyze and fix document revision file sharing (context-aware)
-   - **Compare Orgs**: Compare configurations across orgs
+   - **Org Compare Tool**: Compare configurations across multiple Salesforce orgs
+   - **Export Fields**: Export field metadata from objects to CSV or JSON
 5. Or use keyboard shortcuts for quick access (see Features section)
 
 ## Architecture
@@ -138,6 +208,34 @@ The extension uses:
 ## Development
 
 Built with vanilla JavaScript and Chrome Extension Manifest V3.
+
+### Testing
+
+The extension uses Playwright for E2E testing. Tests run in headed Chrome with the extension loaded.
+
+```bash
+# Install dependencies
+npm install
+
+# Run all tests (headed mode required for extensions)
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests in debug mode
+npm run test:debug
+
+# View test report
+npm run test:report
+```
+
+**Test Structure:**
+- `tests/fixtures/` - Extension loading fixtures and helpers
+- `tests/e2e/` - End-to-end tests for all features
+- `tests/mocks/` - Mock Salesforce API responses
+
+**Note:** Extension E2E tests require headed mode (not headless) because Chrome extensions cannot run in headless mode.
 
 ### Project Structure
 

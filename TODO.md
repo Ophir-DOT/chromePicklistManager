@@ -112,6 +112,28 @@ This document outlines planned features and enhancements for the DOT Toolkit Chr
 
 ---
 
+### 6. Export Fields
+**Description**: Export field definitions and metadata from Salesforce objects.
+
+**Features**:
+- Export all fields from selected object(s)
+- Support multiple export formats (CSV, JSON, Excel)
+- Include field properties (label, API name, type, required, default value, etc.)
+- Export field-level security settings
+- Bulk export across multiple objects
+- Filter fields by type, custom/standard, or other criteria
+- Include relationship details and formula definitions
+
+**API Requirements**:
+- REST API - Describe calls for field metadata
+- Tooling API - CustomField queries
+- Metadata API - Field definitions
+
+**Complexity**: Medium
+**Status**: ✅ Completed in v1.5.0
+
+---
+
 ## 📋 Implementation Notes
 
 ### Development Priorities
