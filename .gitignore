@@ -1,5 +1,5 @@
 /test-files
-/.claude
+
 .mcp.json
 /node_modules
 /playwright-report
