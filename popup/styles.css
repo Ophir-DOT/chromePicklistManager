@@ -1173,6 +1173,41 @@ footer {
   color: var(--brand-color-text-dark);
 }
 
+[data-theme="dark"] .container {
+  background: var(--brand-color-bg-primary);
+}
+
+[data-theme="dark"] .info {
+  background: var(--brand-color-bg-secondary);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .info-item {
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] .back-button {
+  background: var(--brand-color-bg-tertiary);
+  color: var(--brand-color-text-dark);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .back-button:hover {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--brand-color-cta);
+}
+
+[data-theme="dark"] .object-list {
+  background: var(--brand-color-bg-secondary);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .selection-info {
+  background: var(--brand-color-bg-tertiary);
+  color: var(--brand-color-text-dark);
+  border-color: var(--input-border);
+}
+
 /* Cards and Containers */
 [data-theme="dark"] .feature-card,
 [data-theme="dark"] .object-card,
@@ -1208,12 +1243,39 @@ footer {
 }
 
 /* Buttons */
-[data-theme="dark"] .btn-secondary {
+[data-theme="dark"] .action-button {
+  background: var(--brand-color-bg-secondary);
+  border-color: var(--input-border);
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] .action-button:hover {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--brand-color-cta);
+}
+
+[data-theme="dark"] .action-button:disabled {
+  background: var(--brand-color-bg-primary);
+  color: var(--brand-color-neutral-med);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .action-button .icon {
+  color: var(--brand-color-primary);
+}
+
+[data-theme="dark"] .action-button:disabled .icon {
+  color: var(--brand-color-neutral-med);
+}
+
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .secondary-button {
   background: var(--brand-color-bg-tertiary);
   border-color: var(--input-border);
 }
 
-[data-theme="dark"] .btn-secondary:hover {
+[data-theme="dark"] .btn-secondary:hover,
+[data-theme="dark"] .secondary-button:hover {
   background: var(--brand-color-bg-tertiary);
   border-color: var(--brand-color-cta);
 }
@@ -1228,6 +1290,23 @@ footer {
   color: var(--brand-color-text-muted);
 }
 
+/* Footer */
+[data-theme="dark"] footer {
+  background: var(--brand-color-bg-secondary);
+  border-top-color: var(--input-border);
+  color: var(--brand-color-text-muted);
+}
+
+/* Primary and action buttons */
+[data-theme="dark"] .primary-button {
+  background: var(--brand-color-cta);
+  color: var(--brand-color-text-light);
+}
+
+[data-theme="dark"] .primary-button:hover:not(:disabled) {
+  background: #FF1AA3;
+}
+
 /* Checkboxes and field items */
 [data-theme="dark"] .field-item,
 [data-theme="dark"] .checkbox-group label {
@@ -1239,11 +1318,35 @@ footer {
   background: rgba(0, 0, 0, 0.7);
 }
 
-/* Status messages */
+/* Status and loading messages */
+[data-theme="dark"] .loading-message {
+  background: var(--brand-color-bg-secondary);
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] .status-message {
+  background: var(--brand-color-bg-tertiary);
+  color: var(--brand-color-text-dark);
+}
+
 [data-theme="dark"] .success-message,
 [data-theme="dark"] .error-message,
 [data-theme="dark"] .info-message {
   border-color: currentColor;
+}
+
+[data-theme="dark"] .view-header {
+  background: var(--brand-color-bg-secondary);
+  border-bottom-color: var(--input-border);
+}
+
+[data-theme="dark"] .view-header h2 {
+  color: var(--brand-color-text-dark);
+}
+
+[data-theme="dark"] .preview-area {
+  background: var(--brand-color-bg-tertiary);
+  border-color: var(--input-border);
 }
 
 /* Scrollbars (for webkit browsers) */

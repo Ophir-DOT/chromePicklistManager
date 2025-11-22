@@ -4,6 +4,7 @@
 import ThemeManager from '../background/theme-manager.js';
 import SessionManager from '../background/session-manager.js';
 import ExportFieldsAPI from '../background/export-fields-api.js';
+import FieldUsageAPI from '../background/field-usage-api.js';
 
 class ExportFieldsManager {
   constructor() {
@@ -12,6 +13,7 @@ class ExportFieldsManager {
     this.fields = [];
     this.filteredFields = [];
     this.selectedFields = new Set();
+    this.fieldUsageData = new Map(); // Map of field key -> usage stats
     this.settings = {
       defaultExportFormat: 'csv',
       includeToolingMetadata: false
@@ -132,6 +134,9 @@ class ExportFieldsManager {
 
     // Export
     document.getElementById('exportBtn').addEventListener('click', () => this.exportFields());
+
+    // Usage analytics
+    document.getElementById('loadUsageBtn').addEventListener('click', () => this.loadUsageData());
   }
 
   toggleSettingsPanel() {
@@ -326,6 +331,9 @@ class ExportFieldsManager {
         });
 
         this.displayResults();
+
+        // Enable Load Usage button now that we have fields
+        document.getElementById('loadUsageBtn').disabled = false;
       }
 
       console.log('[ExportFieldsManager] Loaded', this.fields.length, 'fields');
@@ -411,6 +419,10 @@ class ExportFieldsManager {
     tbody.innerHTML = pageFields.map(field => {
       const fieldKey = `${field.objectName}.${field.apiName}`;
       const isSelected = this.selectedFields.has(fieldKey);
+      const usageStats = this.fieldUsageData.get(fieldKey);
+      const usageCount = usageStats?.totalUsage || 0;
+      const usageLevel = FieldUsageAPI.getUsageLevel(usageCount);
+      const usageColor = FieldUsageAPI.getUsageColor(usageLevel);
 
       return `
         <tr class="${isSelected ? 'selected' : ''}" data-key="${fieldKey}">
@@ -426,6 +438,9 @@ class ExportFieldsManager {
           </td>
           <td class="col-custom">
             ${field.custom ? '<span class="badge-yes badge-custom">Yes</span>' : ''}
+          </td>
+          <td class="col-usage">
+            ${usageStats ? `<span class="usage-badge ${usageColor}" title="${this.formatUsageTooltip(usageStats)}">${usageCount}</span>` : '<span class="usage-not-loaded">-</span>'}
           </td>
         </tr>
       `;
@@ -565,6 +580,94 @@ class ExportFieldsManager {
     URL.revokeObjectURL(url);
 
     console.log('[ExportFieldsManager] Exported', fieldsToExport.length, 'fields as', format);
+  }
+
+  async loadUsageData() {
+    console.log('[ExportFieldsManager] Loading field usage data');
+
+    if (this.filteredFields.length === 0) {
+      alert('Please load fields first before analyzing usage');
+      return;
+    }
+
+    try {
+      // Disable button and show progress
+      const loadBtn = document.getElementById('loadUsageBtn');
+      const progressDiv = document.getElementById('usageProgress');
+      const progressFill = document.getElementById('usageProgressFill');
+      const progressText = document.getElementById('usageProgressText');
+
+      loadBtn.disabled = true;
+      progressDiv.classList.remove('hidden');
+      progressFill.style.width = '0%';
+
+      // Group fields by object (use all fields, not just filtered)
+      const fieldsByObject = {};
+      this.fields.forEach(field => {
+        if (!fieldsByObject[field.objectName]) {
+          fieldsByObject[field.objectName] = [];
+        }
+        fieldsByObject[field.objectName].push(field.apiName);
+      });
+
+      const objectNames = Object.keys(fieldsByObject);
+      let completed = 0;
+      const total = objectNames.length;
+
+      // Analyze each object's fields
+      for (const objectName of objectNames) {
+        const fieldNames = fieldsByObject[objectName];
+
+        progressText.textContent = `Analyzing ${objectName}... (${completed + 1}/${total})`;
+
+        try {
+          const usageMap = await FieldUsageAPI.getFieldUsageStats(objectName, fieldNames, (current, total) => {
+            // Sub-progress within object
+            const objectProgress = (current / total) * 100;
+            const overallProgress = ((completed + (current / total)) / total) * 100;
+            progressFill.style.width = `${overallProgress}%`;
+          });
+
+          // Store usage data
+          usageMap.forEach((stats, fieldName) => {
+            const fieldKey = `${objectName}.${fieldName}`;
+            this.fieldUsageData.set(fieldKey, stats);
+          });
+
+          completed++;
+          const progress = (completed / total) * 100;
+          progressFill.style.width = `${progress}%`;
+        } catch (error) {
+          console.error(`[ExportFieldsManager] Error analyzing ${objectName}:`, error);
+          // Continue with other objects
+        }
+      }
+
+      progressText.textContent = 'Usage analysis complete!';
+
+      // Re-render table to show usage data
+      this.displayResults();
+
+      // Hide progress after a moment
+      setTimeout(() => {
+        progressDiv.classList.add('hidden');
+        loadBtn.disabled = false;
+      }, 2000);
+
+      console.log('[ExportFieldsManager] Usage data loaded for', this.fieldUsageData.size, 'fields');
+    } catch (error) {
+      console.error('[ExportFieldsManager] Error loading usage data:', error);
+      alert('Failed to load usage data: ' + error.message);
+      document.getElementById('usageProgress').classList.add('hidden');
+      document.getElementById('loadUsageBtn').disabled = false;
+    }
+  }
+
+  formatUsageTooltip(usageStats) {
+    if (usageStats.recordsWithValue > 0) {
+      return `${usageStats.recordsWithValue} record${usageStats.recordsWithValue !== 1 ? 's' : ''} have a value in this field`;
+    }
+    return 'No records have a value in this field';
   }
 }
 

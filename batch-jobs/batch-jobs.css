@@ -445,6 +445,10 @@ body {
   color: var(--color-error);
 }
 
+.job-action-btn.execute:hover {
+  color: var(--color-success);
+}
+
 /* Status Badge */
 .status-badge {
   display: inline-flex;

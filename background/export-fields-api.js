@@ -22,9 +22,21 @@ class ExportFieldsAPI {
         throw new Error('Invalid response from Salesforce API');
       }
 
-      // Filter to objects that are queryable and have describe access
+      // Filter to objects that are queryable and exclude system objects
+      // Exclude History, Share, Feed, and ChangeEvent objects
       const objects = response.sobjects
-        .filter(obj => obj.queryable && obj.searchable !== false)
+        .filter(obj => {
+          if (!obj.queryable) return false;
+
+          // Exclude system tracking objects
+          const name = obj.name;
+          if (name.endsWith('History')) return false;
+          if (name.endsWith('Share')) return false;
+          if (name.endsWith('Feed')) return false;
+          if (name.endsWith('ChangeEvent')) return false;
+
+          return true;
+        })
         .map(obj => ({
           name: obj.name,
           label: obj.label,

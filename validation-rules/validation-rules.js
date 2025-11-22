@@ -163,12 +163,8 @@ class ValidationRulesManager {
       this.rules = rules;
       this.objects = objects;
 
-      // Build a label map from objects for use in rule display
-      // Key is entityId (which matches rule.EntityDefinitionId)
-      this.objectLabelMap = new Map();
-      objects.forEach(obj => {
-        this.objectLabelMap.set(obj.entityId, obj.label);
-      });
+      // Object labels are now part of each rule (ObjectLabel, ObjectApiName)
+      // No need for a separate label map
 
       // Update summary stats
       document.getElementById('totalCount').textContent = summary.total;
@@ -206,8 +202,8 @@ class ValidationRulesManager {
 
     this.objects.forEach(obj => {
       const option = document.createElement('option');
-      // Use entityId for filtering since that matches rule.EntityDefinitionId
-      option.value = obj.entityId;
+      // Use apiName for filtering since that matches rule.ObjectApiName
+      option.value = obj.apiName;
       option.textContent = `${obj.label} (${obj.ruleCount})`;
       select.appendChild(option);
     });
@@ -219,8 +215,8 @@ class ValidationRulesManager {
 
     this.objects.forEach(obj => {
       const option = document.createElement('option');
-      // Use entityId for filtering since that matches rule.EntityDefinitionId
-      option.value = obj.entityId;
+      // Use apiName for filtering since that matches rule.ObjectApiName
+      option.value = obj.apiName;
       option.textContent = `${obj.label} (${obj.ruleCount} rules)`;
       select.appendChild(option);
     });
@@ -232,8 +228,8 @@ class ValidationRulesManager {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
     this.filteredRules = this.rules.filter(rule => {
-      // Object filter - use EntityDefinitionId (the API name)
-      if (objectFilter && rule.EntityDefinitionId !== objectFilter) {
+      // Object filter - use ObjectApiName (enriched from EntityDefinition)
+      if (objectFilter && rule.ObjectApiName !== objectFilter) {
         return false;
       }
 
@@ -252,7 +248,8 @@ class ValidationRulesManager {
           rule.ValidationName,
           rule.ErrorMessage,
           rule.Description,
-          rule.EntityDefinitionId
+          rule.ObjectLabel,
+          rule.ObjectApiName
         ].filter(Boolean).map(s => s.toLowerCase());
 
         if (!searchFields.some(field => field.includes(searchTerm))) {
@@ -302,10 +299,7 @@ class ValidationRulesManager {
 
   renderRuleCard(rule) {
     const formatted = ValidationRuleAPI.formatRule(rule);
-    // Override object label with the one from our label map
-    if (this.objectLabelMap && this.objectLabelMap.has(rule.EntityDefinitionId)) {
-      formatted.objectLabel = this.objectLabelMap.get(rule.EntityDefinitionId);
-    }
+    // Object label is already enriched in the rule (ObjectLabel field)
     const isSelected = this.selectedRules.has(rule.Id);
 
     return `

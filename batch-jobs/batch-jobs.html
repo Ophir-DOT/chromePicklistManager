@@ -240,6 +240,22 @@ Batchable_File_Updates"></textarea>
     </div>
   </div>
 
+  <!-- Execute Now Confirmation Modal -->
+  <div id="executeNowModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Execute Batch Job Now</h3>
+      <p>This will execute the batch job immediately while keeping its schedule intact.</p>
+      <p class="modal-job-info">
+        <strong>Class:</strong> <span id="executeJobClass">--</span><br>
+        <strong>Next Scheduled:</strong> <span id="executeJobNextRun">--</span>
+      </p>
+      <div class="modal-actions">
+        <button id="confirmExecuteBtn" class="btn btn-primary">Execute Now</button>
+        <button id="cancelExecuteBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="batch-jobs.js"></script>
 </body>
 </html>

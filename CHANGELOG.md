@@ -5,6 +5,112 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-11-21
+
+### Focus: Enhanced Comparisons, Monitoring & Field Analytics
+
+### Added
+
+- **Org Compare - Permissions**: Extended Org Compare Tool with permission comparison capability
+  - Compare Profiles and Permission Sets across Salesforce orgs
+  - Object permissions: Create, Read, Edit, Delete, View All, Modify All (6 permission types)
+  - Field permissions: Read, Edit (2 permission types)
+  - Permission type selector (Profile or Permission Set) with dynamic item dropdown
+  - Profile → PermissionSet ID mapping for permission retrieval
+  - Color-coded status indicators:
+    - Green (Match): Permissions are identical
+    - Yellow (Different): Permissions exist but differ
+    - Blue (Source Only): Only in source org
+    - Pink (Target Only): Only in target org
+  - Summary statistics showing total items, matches, differences, source-only, target-only
+  - Export permission comparison results (CSV/JSON via existing export)
+  - Full dark mode support
+  - Search and filter functionality
+  - Added 9 new methods to `background/org-compare-api.js`:
+    - `getProfiles()`, `getPermissionSets()`, `getPermissionSetIdForProfile()`
+    - `getObjectPermissions()`, `getFieldPermissions()`, `getAllPermissions()`
+    - `comparePermissions()`, `compareObjectPermissions()`, `compareFieldPermissions()`
+
+- **Validation Rules - Object Label Fix**: Fixed object name display in Validation Rules Manager
+  - Object names now display as friendly labels (e.g., "Account") instead of record IDs (e.g., "01I8d000002kUKa")
+  - Fixed EntityDefinition query to use `DurableId` field instead of `Id` field
+  - Enriched validation rule records with `ObjectLabel` and `ObjectApiName` fields
+  - Updated filter dropdown to show proper object labels with rule counts
+  - Search now works with both object labels and API names
+  - Updated `getEntityDefinitionLabels()` in `background/validation-rule-api.js`
+  - Updated UI code in `validation-rules/validation-rules.js` to use enriched fields
+
+- **Batch Job Monitor - Execute Scheduled Job Now**: Added ability to execute scheduled jobs immediately
+  - "Execute Now" button on active (WAITING) scheduled jobs in Scheduled Jobs tab
+  - Confirmation dialog showing class name and next scheduled run time
+  - Uses `Database.executeBatch()` via executeAnonymous to run jobs on-demand
+  - Maintains scheduled job configuration (doesn't delete the schedule)
+  - Real-time notification on execution success/failure
+  - Auto-refresh and auto-switch to Active Jobs tab to show newly running job
+  - Returns the AsyncApexJob ID of the newly created job
+  - Added `executeScheduledJobNow()` method to `background/batch-job-api.js`
+  - Added Execute Now modal and button handlers in `batch-jobs/batch-jobs.js`
+  - Green hover color for Execute button (`.job-action-btn.execute:hover`)
+  - Full dark mode support
+
+- **Export Fields - Field Usage Analytics**: Added comprehensive field usage analysis
+  - "Load Usage Data" button to analyze field references across org metadata
+  - "Usage" column in field preview table with color-coded badges
+  - Queries 7 metadata types for field references:
+    - Validation Rules (formula field references)
+    - Workflow Rules (formula field references)
+    - Flows (field references in flow definitions)
+    - Apex Classes (field references in code)
+    - Visualforce Pages (field references in markup)
+    - Lightning Components (field references in Aura components)
+    - Formula Fields (references to other fields)
+  - Color-coded usage levels with visual indicators:
+    - Gray (Unused): 0 references
+    - Blue (Low): 1-2 references
+    - Orange (Medium): 3-10 references
+    - Red (High): 10+ references
+  - Hover tooltip shows breakdown by usage type
+  - Sort by usage count via sortable table header
+  - Progress indicator with per-object status updates
+  - Non-blocking analysis (continues on errors)
+  - On-demand loading (usage loads only when requested)
+  - Usage data persists across sorting and filtering
+  - Created new `background/field-usage-api.js` module with 8 analysis methods
+  - Full dark mode support for all usage indicators
+
+- **Popup Menu - Dark Theme**: Fixed dark theme styling issues in main popup menu
+  - Fixed `.action-button` white background in dark mode
+  - Added dark mode styles for `.container`, `.info`, `.info-item`
+  - Added dark mode styles for `.back-button`, `.object-list`, `.selection-info`
+  - Fixed icon colors in disabled and enabled states
+  - Fixed `footer` dark background with proper border
+  - Fixed `.primary-button` colors in dark mode
+  - Added dark mode for `.loading-message`, `.status-message`, `.view-header`, `.preview-area`
+  - All popup menu elements now properly support dark mode
+
+### Technical Notes
+
+- **API Version**: All REST and Tooling API calls use v59.0
+- **EntityDefinition**: Uses `DurableId` field to match `ValidationRule.EntityDefinitionId`
+- **Permission Comparison**: Profiles map to PermissionSets for unified permission retrieval
+- **Field Usage**: Analyzes fields per-object to optimize API calls and avoid rate limits
+- **Execute Anonymous**: Used for triggering scheduled jobs via `Database.executeBatch()`
+- **Progressive Enhancement**: Field usage analytics load on-demand to avoid performance impact
+
+### Performance Considerations
+
+- Field usage analytics may be expensive for large orgs with many fields
+- Flow analysis limited to 50 flows to avoid timeout
+- Apex class search limited to 100 classes per query
+- Usage analysis runs per-object with progress tracking
+- Non-blocking error handling ensures analysis continues even if some metadata types fail
+
+### Documentation
+
+- Updated `.v1.6-progress.md` with complete implementation details for all 4 phases
+- All features include keyboard shortcut references where applicable
+- Comprehensive inline JSDoc comments added to new API methods
+
 ## [1.5.0] - 2025-11-20
 
 ### Focus: Advanced Administration & Security Features

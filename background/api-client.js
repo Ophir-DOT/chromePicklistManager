@@ -14,18 +14,8 @@ class SalesforceAPI {
    * @returns {Promise<any>} - Parsed JSON response
    */
   async callAPI(endpoint, { method = 'GET', body = null, headers = {} } = {}) {
-    console.log(`[SalesforceAPI] Making ${method} request to:`, endpoint);
-
     // Get current session
     const session = await SessionManager.getCurrentSession();
-
-    console.log('[SalesforceAPI] Session:', {
-      hasSession: !!session,
-      hasSessionId: !!session?.sessionId,
-      instanceUrl: session?.instanceUrl,
-      sessionIdLength: session?.sessionId?.length,
-      sessionIdPrefix: session?.sessionId?.substring(0, 10)
-    });
 
     if (!session || !session.sessionId) {
       throw new Error('No active Salesforce session. Please refresh the page.');
@@ -33,9 +23,6 @@ class SalesforceAPI {
 
     // Build full URL
     const fullUrl = new URL(endpoint, session.instanceUrl);
-    console.log('[SalesforceAPI] Full URL:', fullUrl.toString());
-    console.log('[SalesforceAPI] URL hostname:', fullUrl.hostname);
-    console.log('[SalesforceAPI] URL protocol:', fullUrl.protocol);
 
     // Build headers - THIS IS THE CRITICAL FIX
     // Service workers (Manifest V3) use fetch() but FROM EXTENSION CONTEXT
@@ -47,8 +34,6 @@ class SalesforceAPI {
       'Sforce-Call-Options': 'client=Salesforce Picklist Manager',
       ...headers
     };
-
-    console.log('[SalesforceAPI] Using Authorization header with session ID');
 
     // Build fetch options
     const fetchOptions = {
@@ -64,8 +49,6 @@ class SalesforceAPI {
     // CRITICAL: Must use XMLHttpRequest, not fetch()!
     // Extension pages (popup, sidepanel) can use XMLHttpRequest for cross-origin requests
     // but fetch() is still subject to CORS restrictions even in extension context
-    console.log('[SalesforceAPI] Using XMLHttpRequest for cross-origin request');
-
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open(method, fullUrl.toString(), true);
@@ -86,11 +69,7 @@ class SalesforceAPI {
 
       xhr.onreadystatechange = () => {
         if (xhr.readyState === 4) {
-          console.log('[SalesforceAPI] Response received');
-          console.log('[SalesforceAPI] Response status:', xhr.status);
-
           if (xhr.status >= 200 && xhr.status < 300) {
-            console.log('[SalesforceAPI] Success!');
             resolve(xhr.response);
           } else if (xhr.status === 401) {
             const error = new Error('Session expired or invalid. Please refresh the Salesforce page and try again.');

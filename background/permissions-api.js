@@ -12,7 +12,6 @@ class PermissionsAPI {
    * @returns {Promise<Array>} Array of profile records
    */
   static async getProfiles(options = {}) {
-    console.log('[PermissionsAPI] Getting profiles', options);
 
     const { limit = 200 } = options;
 
@@ -27,7 +26,6 @@ class PermissionsAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[PermissionsAPI] Found', response.records?.length || 0, 'profiles');
       return response.records || [];
     } catch (error) {
       console.error('[PermissionsAPI] Error querying profiles:', error);
@@ -42,7 +40,6 @@ class PermissionsAPI {
    * @returns {Promise<Array>} Array of permission set records
    */
   static async getPermissionSets(options = {}) {
-    console.log('[PermissionsAPI] Getting permission sets', options);
 
     const { limit = 200 } = options;
 
@@ -59,7 +56,6 @@ class PermissionsAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[PermissionsAPI] Found', response.records?.length || 0, 'permission sets');
       return response.records || [];
     } catch (error) {
       console.error('[PermissionsAPI] Error querying permission sets:', error);
@@ -73,7 +69,6 @@ class PermissionsAPI {
    * @returns {Promise<string>} The PermissionSet ID
    */
   static async getPermissionSetIdForProfile(profileId) {
-    console.log('[PermissionsAPI] Getting PermissionSet ID for profile', profileId);
 
     const query = `
       SELECT Id
@@ -102,7 +97,6 @@ class PermissionsAPI {
    * @returns {Promise<Array>} Array of field permission records
    */
   static async getFieldPermissions(permissionSetId) {
-    console.log('[PermissionsAPI] Getting field permissions for', permissionSetId);
 
     const query = `
       SELECT Id, Field, SobjectType, PermissionsEdit, PermissionsRead, ParentId
@@ -115,7 +109,6 @@ class PermissionsAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[PermissionsAPI] Found', response.records?.length || 0, 'field permissions');
       return response.records || [];
     } catch (error) {
       console.error('[PermissionsAPI] Error querying field permissions:', error);
@@ -129,7 +122,6 @@ class PermissionsAPI {
    * @returns {Promise<Array>} Array of object permission records
    */
   static async getObjectPermissions(permissionSetId) {
-    console.log('[PermissionsAPI] Getting object permissions for', permissionSetId);
 
     const query = `
       SELECT Id, SobjectType, ParentId,
@@ -144,7 +136,6 @@ class PermissionsAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[PermissionsAPI] Found', response.records?.length || 0, 'object permissions');
       return response.records || [];
     } catch (error) {
       console.error('[PermissionsAPI] Error querying object permissions:', error);
@@ -159,7 +150,6 @@ class PermissionsAPI {
    * @returns {Promise<object>} Object containing field and object permissions
    */
   static async getAllPermissions(id, type) {
-    console.log('[PermissionsAPI] Getting all permissions for', type, id);
 
     let permissionSetId = id;
 
@@ -188,7 +178,6 @@ class PermissionsAPI {
    * @returns {Promise<object>} Comparison results
    */
   static async comparePermissions(source, target) {
-    console.log('[PermissionsAPI] Comparing permissions:', source.name, 'vs', target.name);
 
     // Get all permissions for both
     const [sourcePerms, targetPerms] = await Promise.all([
@@ -414,7 +403,6 @@ class PermissionsAPI {
    * @returns {string} JSON string
    */
   static exportToJSON(profiles, permissionSets, permissionsData) {
-    console.log('[PermissionsAPI] Exporting to JSON');
 
     const exportData = {
       exportDate: new Date().toISOString(),
@@ -448,7 +436,6 @@ class PermissionsAPI {
    * @returns {string} CSV string
    */
   static exportToCSV(profiles, permissionSets, permissionsData, exportType = 'object') {
-    console.log('[PermissionsAPI] Exporting to CSV, type:', exportType);
 
     const rows = [];
 
@@ -564,7 +551,6 @@ class PermissionsAPI {
    * @returns {string} CSV string
    */
   static exportComparisonToCSV(comparison, type = 'object') {
-    console.log('[PermissionsAPI] Exporting comparison to CSV, type:', type);
 
     const rows = [];
     const sourceName = comparison.source.name;
@@ -664,7 +650,6 @@ class PermissionsAPI {
    * @returns {object} Parsed permission data
    */
   static parseImportCSV(csvContent) {
-    console.log('[PermissionsAPI] Parsing import CSV');
 
     const lines = csvContent.split('\n').filter(line => line.trim());
     if (lines.length < 2) {
@@ -734,7 +719,6 @@ class PermissionsAPI {
    * @returns {Promise<object>} Summary statistics
    */
   static async getPermissionSummary(permissionSetId) {
-    console.log('[PermissionsAPI] Getting permission summary for', permissionSetId);
 
     const [fieldPerms, objectPerms] = await Promise.all([
       this.getFieldPermissions(permissionSetId),
