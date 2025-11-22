@@ -726,7 +726,6 @@ class HealthCheckAPI {
    * @returns {Promise<object>} - Check result with sharing details
    */
   static async checkDocumentRevisionSharing(recordId) {
-    console.log('[HealthCheckAPI] Checking document revision sharing for:', recordId);
 
     try {
       // Step 1: Get PDF_ID__c, FILE_ID__c, and State from Document Revision record
@@ -752,10 +751,6 @@ class HealthCheckAPI {
       const fileId = revision.CompSuite__File_Id__c;
       const stateName = revision.CompSuite__State__r?.Name || '';
 
-      console.log('[HealthCheckAPI] Found revision:', revision.Name);
-      console.log('[HealthCheckAPI] PDF_Id:', pdfId, 'FILE_Id:', fileId);
-      console.log('[HealthCheckAPI] State:', stateName);
-      console.log('[HealthCheckAPI] Full revision object:', revision);
 
       if (!pdfId && !fileId) {
         return {
@@ -797,7 +792,6 @@ class HealthCheckAPI {
         };
       }
 
-      console.log('[HealthCheckAPI] Found', versionResult.records.length, 'ContentVersion records');
 
       // Create a map of version ID to version record
       const versionMap = {};
@@ -814,13 +808,11 @@ class HealthCheckAPI {
 
       const linkResult = await this.soqlQuery(linkQuery);
 
-      console.log('[HealthCheckAPI] Found', linkResult.totalSize, 'ContentDocumentLink records');
 
       // Step 4: Get EntityDefinition mapping for key prefixes
       const entityDefQuery = `SELECT KeyPrefix, Label FROM EntityDefinition WHERE KeyPrefix != null`;
       const entityDefResult = await this.soqlQuery(entityDefQuery);
 
-      console.log('[HealthCheckAPI] Found', entityDefResult.totalSize, 'EntityDefinition records');
 
       // Create a map of KeyPrefix to Label (case-sensitive)
       const keyPrefixMap = {};
@@ -955,7 +947,6 @@ class HealthCheckAPI {
    * @returns {Promise<object>} - Result of the operation
    */
   static async addMissingDocumentRevisionLinks(recordId) {
-    console.log('[HealthCheckAPI] Adding missing document revision links for:', recordId);
 
     try {
       // Step 1: Get Document Revision details including Version
@@ -979,7 +970,6 @@ class HealthCheckAPI {
       const versionNumber = revision.CompSuite__Version__c;
       const stateName = revision.CompSuite__State__r?.Name || '';
 
-      console.log('[HealthCheckAPI] Document Revision:', revision.Name, 'Version:', versionNumber);
 
       if (!pdfId && !fileId) {
         return {
@@ -1014,7 +1004,6 @@ class HealthCheckAPI {
       const revisionLog = revisionLogResult.records[0];
       const linkedEntityId = revisionLog.Id;
 
-      console.log('[HealthCheckAPI] Found matching Revision Log:', revisionLog.Name, '(', linkedEntityId, ')');
 
       // Step 3: Get ContentDocumentIds from ContentVersion IDs
       const fileTypeMap = [];
@@ -1058,7 +1047,6 @@ class HealthCheckAPI {
         });
       }
 
-      console.log('[HealthCheckAPI] Existing links:', existingLinks.size);
 
       // Step 5: Create missing ContentDocumentLink records
       const linksToCreate = [];
@@ -1081,7 +1069,6 @@ class HealthCheckAPI {
         };
       }
 
-      console.log('[HealthCheckAPI] Creating', linksToCreate.length, 'missing links');
 
       // Create ContentDocumentLink records using REST API
       const session = await SessionManager.getCurrentSession();
@@ -1122,7 +1109,6 @@ class HealthCheckAPI {
             linkId: result.id
           });
 
-          console.log('[HealthCheckAPI] Created ContentDocumentLink:', result.id, 'for', link.type);
         } catch (error) {
           console.error('[HealthCheckAPI] Error creating link:', error);
           throw error;
@@ -1154,7 +1140,6 @@ class HealthCheckAPI {
    * @returns {Promise<object>} - Check result
    */
   static async runSingleCheck(checkName, customCheck = null) {
-    console.log('[HealthCheckAPI] Running single check:', checkName);
 
     try {
       // Map check names to validation methods
@@ -1203,13 +1188,11 @@ class HealthCheckAPI {
   static async runAllHealthChecks() {
     const startTime = Date.now();
 
-    console.log('[HealthCheckAPI] Starting all health checks...');
 
     // Load custom checks
     const customChecks = await this.loadCustomChecks();
     const enabledCustomChecks = customChecks.filter(c => c.enabled);
 
-    console.log('[HealthCheckAPI] Found', enabledCustomChecks.length, 'enabled custom checks');
 
     // Execute standard checks in parallel
     const standardChecks = [
@@ -1230,12 +1213,10 @@ class HealthCheckAPI {
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-    console.log('[HealthCheckAPI] All health checks completed in', duration, 'seconds');
 
     // Extract values from settled promises
     const checks = results.map((result, index) => {
       if (result.status === 'fulfilled') {
-        console.log('[HealthCheckAPI] Check', index, 'fulfilled:', result.value.name);
         return result.value;
       } else {
         // If promise rejected, return error state

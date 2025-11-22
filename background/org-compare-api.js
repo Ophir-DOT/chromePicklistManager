@@ -11,7 +11,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of session objects with org info
    */
   static async getAllActiveSessions() {
-    console.log('[OrgCompareAPI] Getting all active Salesforce sessions');
 
     const sessions = [];
     const seenOrgs = new Set();
@@ -27,7 +26,6 @@ class OrgCompareAPI {
                tab.url.includes('salesforce-setup.com');
       });
 
-      console.log('[OrgCompareAPI] Found', salesforceTabs.length, 'Salesforce tabs');
 
       // Extract session from each tab
       for (const tab of salesforceTabs) {
@@ -43,7 +41,6 @@ class OrgCompareAPI {
         }
       }
 
-      console.log('[OrgCompareAPI] Found', sessions.length, 'unique org sessions');
       return sessions;
     } catch (error) {
       console.error('[OrgCompareAPI] Error getting sessions:', error);
@@ -222,7 +219,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of object metadata
    */
   static async getObjects(session) {
-    console.log('[OrgCompareAPI] Getting objects from', session.orgName);
 
     const response = await this.callOrgAPI(session, '/services/data/v59.0/sobjects');
 
@@ -246,7 +242,6 @@ class OrgCompareAPI {
    * @returns {Promise<object>} Object metadata with fields
    */
   static async getObjectMetadata(session, objectName) {
-    console.log('[OrgCompareAPI] Getting metadata for', objectName, 'from', session.orgName);
 
     const response = await this.callOrgAPI(session, `/services/data/v59.0/sobjects/${objectName}/describe`);
 
@@ -280,7 +275,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of validation rules
    */
   static async getValidationRules(session, objectName = null) {
-    console.log('[OrgCompareAPI] Getting validation rules from', session.orgName);
 
     let query = `
       SELECT Id, ValidationName, Active, Description,
@@ -316,7 +310,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of flows
    */
   static async getFlows(session) {
-    console.log('[OrgCompareAPI] Getting flows from', session.orgName);
 
     const query = `
       SELECT Id, ApiName, Label, ProcessType, Status,
@@ -349,7 +342,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of picklist values
    */
   static async getPicklistValues(session, objectName, fieldName) {
-    console.log('[OrgCompareAPI] Getting picklist values for', objectName + '.' + fieldName, 'from', session.orgName);
 
     const metadata = await this.getObjectMetadata(session, objectName);
     const field = metadata.fields.find(f => f.name === fieldName);
@@ -373,7 +365,6 @@ class OrgCompareAPI {
    * @returns {Promise<Array>} Array of dependency relationships
    */
   static async getFieldDependencies(session, objectName) {
-    console.log('[OrgCompareAPI] Getting field dependencies for', objectName, 'from', session.orgName);
 
     const metadata = await this.getObjectMetadata(session, objectName);
     const dependencies = [];
@@ -398,6 +389,172 @@ class OrgCompareAPI {
   }
 
   /**
+   * Get all Profiles from an org
+   * @param {object} session - Session object
+   * @returns {Promise<Array>} Array of profile records
+   */
+  static async getProfiles(session) {
+
+    const query = `
+      SELECT Id, Name, UserLicense.Name, UserType, Description
+      FROM Profile
+      ORDER BY Name
+      LIMIT 200
+    `;
+
+    const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
+    const response = await this.callOrgAPI(session, endpoint);
+
+    return (response.records || []).map(profile => ({
+      id: profile.Id,
+      name: profile.Name,
+      license: profile.UserLicense?.Name || 'Unknown',
+      userType: profile.UserType,
+      description: profile.Description || ''
+    }));
+  }
+
+  /**
+   * Get all Permission Sets from an org (excluding profile-associated ones)
+   * @param {object} session - Session object
+   * @returns {Promise<Array>} Array of permission set records
+   */
+  static async getPermissionSets(session) {
+
+    const query = `
+      SELECT Id, Name, Label, Description, IsOwnedByProfile,
+             License.Name, NamespacePrefix, Type
+      FROM PermissionSet
+      WHERE IsOwnedByProfile = false
+      ORDER BY Label
+      LIMIT 200
+    `;
+
+    const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
+    const response = await this.callOrgAPI(session, endpoint);
+
+    return (response.records || []).map(ps => ({
+      id: ps.Id,
+      name: ps.Name,
+      label: ps.Label || ps.Name,
+      description: ps.Description || '',
+      license: ps.License?.Name || 'None',
+      namespace: ps.NamespacePrefix || ''
+    }));
+  }
+
+  /**
+   * Get the PermissionSet ID associated with a Profile
+   * @param {object} session - Session object
+   * @param {string} profileId - Profile ID
+   * @returns {Promise<string>} PermissionSet ID
+   */
+  static async getPermissionSetIdForProfile(session, profileId) {
+
+    const query = `
+      SELECT Id
+      FROM PermissionSet
+      WHERE ProfileId = '${profileId}'
+      LIMIT 1
+    `;
+
+    const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
+    const response = await this.callOrgAPI(session, endpoint);
+
+    if (response.records && response.records.length > 0) {
+      return response.records[0].Id;
+    }
+    throw new Error(`No PermissionSet found for Profile ${profileId}`);
+  }
+
+  /**
+   * Get Object Permissions for a PermissionSet
+   * @param {object} session - Session object
+   * @param {string} permissionSetId - PermissionSet ID
+   * @returns {Promise<Array>} Array of object permissions
+   */
+  static async getObjectPermissions(session, permissionSetId) {
+
+    const query = `
+      SELECT Id, SobjectType, ParentId,
+             PermissionsCreate, PermissionsRead, PermissionsEdit,
+             PermissionsDelete, PermissionsViewAllRecords, PermissionsModifyAllRecords
+      FROM ObjectPermissions
+      WHERE ParentId = '${permissionSetId}'
+      ORDER BY SobjectType
+    `;
+
+    const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
+    const response = await this.callOrgAPI(session, endpoint);
+
+    return (response.records || []).map(perm => ({
+      object: perm.SobjectType,
+      create: perm.PermissionsCreate,
+      read: perm.PermissionsRead,
+      edit: perm.PermissionsEdit,
+      delete: perm.PermissionsDelete,
+      viewAll: perm.PermissionsViewAllRecords,
+      modifyAll: perm.PermissionsModifyAllRecords
+    }));
+  }
+
+  /**
+   * Get Field Permissions for a PermissionSet
+   * @param {object} session - Session object
+   * @param {string} permissionSetId - PermissionSet ID
+   * @returns {Promise<Array>} Array of field permissions
+   */
+  static async getFieldPermissions(session, permissionSetId) {
+
+    const query = `
+      SELECT Id, Field, SobjectType, PermissionsEdit, PermissionsRead, ParentId
+      FROM FieldPermissions
+      WHERE ParentId = '${permissionSetId}'
+      ORDER BY SobjectType, Field
+      LIMIT 2000
+    `;
+
+    const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
+    const response = await this.callOrgAPI(session, endpoint);
+
+    return (response.records || []).map(perm => ({
+      field: perm.Field,
+      object: perm.SobjectType,
+      read: perm.PermissionsRead,
+      edit: perm.PermissionsEdit
+    }));
+  }
+
+  /**
+   * Get all permissions (object + field) for a Profile or PermissionSet
+   * @param {object} session - Session object
+   * @param {string} id - Profile or PermissionSet ID
+   * @param {string} type - 'Profile' or 'PermissionSet'
+   * @returns {Promise<object>} Object and field permissions
+   */
+  static async getAllPermissions(session, id, type) {
+
+    let permissionSetId = id;
+
+    // If it's a Profile, get the associated PermissionSet
+    if (type === 'Profile') {
+      permissionSetId = await this.getPermissionSetIdForProfile(session, id);
+    }
+
+    // Fetch object and field permissions in parallel
+    const [objectPermissions, fieldPermissions] = await Promise.all([
+      this.getObjectPermissions(session, permissionSetId),
+      this.getFieldPermissions(session, permissionSetId)
+    ]);
+
+    return {
+      permissionSetId,
+      objectPermissions,
+      fieldPermissions
+    };
+  }
+
+  /**
    * Compare metadata between two orgs
    * @param {object} sourceSession - Source org session
    * @param {object} targetSession - Target org session
@@ -406,8 +563,6 @@ class OrgCompareAPI {
    * @returns {Promise<object>} Comparison results
    */
   static async compareOrgs(sourceSession, targetSession, metadataTypes, options = {}) {
-    console.log('[OrgCompareAPI] Comparing orgs:', sourceSession.orgName, 'vs', targetSession.orgName);
-    console.log('[OrgCompareAPI] Metadata types:', metadataTypes);
 
     const results = {
       source: {
@@ -464,7 +619,6 @@ class OrgCompareAPI {
       }
     }
 
-    console.log('[OrgCompareAPI] Comparison complete:', results.summary);
     return results;
   }
 
@@ -477,7 +631,6 @@ class OrgCompareAPI {
    * @returns {Promise<object>} Comparison result for this type
    */
   static async compareMetadataType(sourceSession, targetSession, metadataType, options) {
-    console.log('[OrgCompareAPI] Comparing metadata type:', metadataType);
 
     let sourceData, targetData;
 
@@ -546,9 +699,235 @@ class OrgCompareAPI {
           ['controllingField', 'valuesCount']
         );
 
+      case 'permissions':
+        if (!options.permissionId || !options.permissionType) {
+          throw new Error('Permission ID and type required for permission comparison');
+        }
+        const sourcePerms = await this.getAllPermissions(
+          sourceSession,
+          options.permissionId,
+          options.permissionType
+        );
+        const targetPerms = await this.getAllPermissions(
+          targetSession,
+          options.permissionId,
+          options.permissionType
+        );
+        return this.comparePermissions(sourcePerms, targetPerms);
+
       default:
         throw new Error(`Unknown metadata type: ${metadataType}`);
     }
+  }
+
+  /**
+   * Compare permissions between two orgs
+   * @param {object} sourcePerms - Source permissions object
+   * @param {object} targetPerms - Target permissions object
+   * @returns {object} Comparison result
+   */
+  static comparePermissions(sourcePerms, targetPerms) {
+    // Compare object permissions
+    const objectComparison = this.compareObjectPermissions(
+      sourcePerms.objectPermissions,
+      targetPerms.objectPermissions
+    );
+
+    // Compare field permissions
+    const fieldComparison = this.compareFieldPermissions(
+      sourcePerms.fieldPermissions,
+      targetPerms.fieldPermissions
+    );
+
+    const totalItems = objectComparison.totalItems + fieldComparison.totalItems;
+    const matches = objectComparison.matches + fieldComparison.matches;
+    const differences = objectComparison.differences + fieldComparison.differences;
+    const sourceOnly = objectComparison.sourceOnly + fieldComparison.sourceOnly;
+    const targetOnly = objectComparison.targetOnly + fieldComparison.targetOnly;
+
+    return {
+      totalItems,
+      matches,
+      differences,
+      sourceOnly,
+      targetOnly,
+      items: [
+        ...objectComparison.items.map(item => ({ ...item, type: 'object' })),
+        ...fieldComparison.items.map(item => ({ ...item, type: 'field' }))
+      ],
+      objectComparison,
+      fieldComparison
+    };
+  }
+
+  /**
+   * Compare object permissions
+   * @param {Array} sourcePerms - Source object permissions
+   * @param {Array} targetPerms - Target object permissions
+   * @returns {object} Comparison result
+   */
+  static compareObjectPermissions(sourcePerms, targetPerms) {
+    const result = {
+      totalItems: 0,
+      matches: 0,
+      differences: 0,
+      sourceOnly: 0,
+      targetOnly: 0,
+      items: []
+    };
+
+    const sourceMap = new Map();
+    sourcePerms.forEach(p => sourceMap.set(p.object, p));
+
+    const targetMap = new Map();
+    targetPerms.forEach(p => targetMap.set(p.object, p));
+
+    const allObjects = new Set([...sourceMap.keys(), ...targetMap.keys()]);
+    result.totalItems = allObjects.size;
+
+    for (const objectName of allObjects) {
+      const sourcePerm = sourceMap.get(objectName);
+      const targetPerm = targetMap.get(objectName);
+
+      const item = {
+        key: objectName,
+        status: '',
+        sourceValues: {},
+        targetValues: {},
+        differences: []
+      };
+
+      if (sourcePerm && targetPerm) {
+        // Compare all permission fields
+        const fields = ['create', 'read', 'edit', 'delete', 'viewAll', 'modifyAll'];
+        let hasDifference = false;
+
+        for (const field of fields) {
+          item.sourceValues[field] = sourcePerm[field];
+          item.targetValues[field] = targetPerm[field];
+
+          if (sourcePerm[field] !== targetPerm[field]) {
+            hasDifference = true;
+            item.differences.push(field);
+          }
+        }
+
+        if (hasDifference) {
+          item.status = 'different';
+          result.differences++;
+        } else {
+          item.status = 'match';
+          result.matches++;
+        }
+      } else if (sourcePerm) {
+        item.status = 'sourceOnly';
+        result.sourceOnly++;
+        item.sourceValues = { ...sourcePerm };
+        item.targetValues = { create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false };
+      } else {
+        item.status = 'targetOnly';
+        result.targetOnly++;
+        item.sourceValues = { create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false };
+        item.targetValues = { ...targetPerm };
+      }
+
+      result.items.push(item);
+    }
+
+    // Sort by status priority
+    const statusOrder = { different: 0, sourceOnly: 1, targetOnly: 2, match: 3 };
+    result.items.sort((a, b) => {
+      const orderDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (orderDiff !== 0) return orderDiff;
+      return a.key.localeCompare(b.key);
+    });
+
+    return result;
+  }
+
+  /**
+   * Compare field permissions
+   * @param {Array} sourcePerms - Source field permissions
+   * @param {Array} targetPerms - Target field permissions
+   * @returns {object} Comparison result
+   */
+  static compareFieldPermissions(sourcePerms, targetPerms) {
+    const result = {
+      totalItems: 0,
+      matches: 0,
+      differences: 0,
+      sourceOnly: 0,
+      targetOnly: 0,
+      items: []
+    };
+
+    const sourceMap = new Map();
+    sourcePerms.forEach(p => sourceMap.set(p.field, p));
+
+    const targetMap = new Map();
+    targetPerms.forEach(p => targetMap.set(p.field, p));
+
+    const allFields = new Set([...sourceMap.keys(), ...targetMap.keys()]);
+    result.totalItems = allFields.size;
+
+    for (const fieldKey of allFields) {
+      const sourcePerm = sourceMap.get(fieldKey);
+      const targetPerm = targetMap.get(fieldKey);
+
+      const item = {
+        key: fieldKey,
+        object: sourcePerm?.object || targetPerm?.object,
+        status: '',
+        sourceValues: {},
+        targetValues: {},
+        differences: []
+      };
+
+      if (sourcePerm && targetPerm) {
+        const fields = ['read', 'edit'];
+        let hasDifference = false;
+
+        for (const field of fields) {
+          item.sourceValues[field] = sourcePerm[field];
+          item.targetValues[field] = targetPerm[field];
+
+          if (sourcePerm[field] !== targetPerm[field]) {
+            hasDifference = true;
+            item.differences.push(field);
+          }
+        }
+
+        if (hasDifference) {
+          item.status = 'different';
+          result.differences++;
+        } else {
+          item.status = 'match';
+          result.matches++;
+        }
+      } else if (sourcePerm) {
+        item.status = 'sourceOnly';
+        result.sourceOnly++;
+        item.sourceValues = { read: sourcePerm.read, edit: sourcePerm.edit };
+        item.targetValues = { read: false, edit: false };
+      } else {
+        item.status = 'targetOnly';
+        result.targetOnly++;
+        item.sourceValues = { read: false, edit: false };
+        item.targetValues = { read: targetPerm.read, edit: targetPerm.edit };
+      }
+
+      result.items.push(item);
+    }
+
+    // Sort by status priority
+    const statusOrder = { different: 0, sourceOnly: 1, targetOnly: 2, match: 3 };
+    result.items.sort((a, b) => {
+      const orderDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (orderDiff !== 0) return orderDiff;
+      return a.key.localeCompare(b.key);
+    });
+
+    return result;
   }
 
   /**

@@ -7,15 +7,12 @@ import HealthCheckAPI from './health-check-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Salesforce Picklist Manager installed');
-
   // Initialize update checker
   UpdateChecker.initialize();
 });
 
 // Initialize update checker on startup
 chrome.runtime.onStartup.addListener(() => {
-  console.log('Salesforce Picklist Manager started');
   UpdateChecker.initialize();
 });
 
@@ -188,12 +185,9 @@ async function compareOrgs(sourceData, targetData) {
 }
 
 async function getObjects() {
-  console.log('[getObjects] Starting with new API client...');
-
   try {
     // Use the new XMLHttpRequest-based API client with Authorization header
     const objects = await SalesforceAPI.getObjects();
-    console.log('[getObjects] Success! Got', objects.length, 'objects');
     return objects;
   } catch (error) {
     console.error('[getObjects] API call failed:', error);
@@ -308,8 +302,6 @@ function compareFieldValues(source, target) {
 
 // Keyboard shortcuts handler
 chrome.commands.onCommand.addListener(async (command) => {
-  console.log('[ServiceWorker] Command received:', command);
-
   try {
     // Get the current active tab to ensure we're on a Salesforce page
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

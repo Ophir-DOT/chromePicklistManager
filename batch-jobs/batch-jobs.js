@@ -34,6 +34,9 @@ class BatchJobMonitor {
     // Job to abort
     this.jobToAbort = null;
 
+    // Job to execute now
+    this.jobToExecute = null;
+
     this.init();
   }
 
@@ -193,6 +196,10 @@ class BatchJobMonitor {
     // Abort modal
     document.getElementById('confirmAbortBtn').addEventListener('click', () => this.confirmAbort());
     document.getElementById('cancelAbortBtn').addEventListener('click', () => this.closeAbortModal());
+
+    // Execute Now modal
+    document.getElementById('confirmExecuteBtn').addEventListener('click', () => this.confirmExecuteNow());
+    document.getElementById('cancelExecuteBtn').addEventListener('click', () => this.closeExecuteNowModal());
   }
 
   switchTab(tab) {
@@ -353,6 +360,15 @@ class BatchJobMonitor {
     emptyState.classList.add('hidden');
 
     container.innerHTML = this.scheduledJobs.map(job => this.createScheduledJobCard(job)).join('');
+
+    // Add execute now button handlers
+    container.querySelectorAll('.execute-now-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const jobId = e.currentTarget.dataset.jobId;
+        const className = e.currentTarget.dataset.className;
+        this.showExecuteNowModal(jobId, className);
+      });
+    });
   }
 
   filterJobs(jobs) {
@@ -447,6 +463,8 @@ class BatchJobMonitor {
   createScheduledJobCard(job) {
     const nextFire = job.NextFireTime ? this.formatDate(job.NextFireTime) : 'Not scheduled';
     const prevFire = job.PreviousFireTime ? this.formatDate(job.PreviousFireTime) : 'Never';
+    const className = job.CronJobDetail?.Name || 'Unknown';
+    const isActive = job.State === 'WAITING';
 
     return `
       <div class="job-card">
@@ -454,16 +472,21 @@ class BatchJobMonitor {
           <div class="job-info">
             <span class="material-symbols-rounded job-type-icon">event_repeat</span>
             <div class="job-details">
-              <h3>${job.CronJobDetail?.Name || 'Unknown'}</h3>
+              <h3>${className}</h3>
               <span class="job-meta">
                 Scheduled Job | Triggered ${job.TimesTriggered || 0} times
               </span>
             </div>
           </div>
           <div class="job-actions">
-            <span class="status-badge ${job.State === 'WAITING' ? 'status-queued' : 'status-aborted'}">
+            <span class="status-badge ${isActive ? 'status-queued' : 'status-aborted'}">
               ${job.State}
             </span>
+            ${isActive ? `
+              <button class="job-action-btn execute execute-now-btn" data-job-id="${job.Id}" data-class-name="${className}" title="Execute Now">
+                <span class="material-symbols-rounded">play_arrow</span>
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -581,6 +604,45 @@ class BatchJobMonitor {
     } catch (error) {
       console.error('[BatchJobMonitor] Error aborting job:', error);
       alert('Failed to abort job: ' + error.message);
+    }
+  }
+
+  showExecuteNowModal(jobId, className) {
+    const job = this.scheduledJobs.find(j => j.Id === jobId);
+    if (!job) return;
+
+    this.jobToExecute = { id: jobId, className: className, job: job };
+    document.getElementById('executeJobClass').textContent = className;
+    const nextRun = job.NextFireTime ? this.formatDate(job.NextFireTime) : 'Not scheduled';
+    document.getElementById('executeJobNextRun').textContent = nextRun;
+    document.getElementById('executeNowModal').classList.remove('hidden');
+  }
+
+  closeExecuteNowModal() {
+    this.jobToExecute = null;
+    document.getElementById('executeNowModal').classList.add('hidden');
+  }
+
+  async confirmExecuteNow() {
+    if (!this.jobToExecute) return;
+
+    const { id, className } = this.jobToExecute;
+
+    try {
+      // Call the API to execute the scheduled job now
+      const result = await BatchJobAPI.executeScheduledJobNow(id, className);
+
+      this.showNotification('Job Started', `${className} is now running`, 'success');
+      this.closeExecuteNowModal();
+      // Wait a moment then refresh to show the new job in active tab
+      setTimeout(() => {
+        this.loadAllJobs();
+        // Switch to active tab to show the newly started job
+        this.switchTab('active');
+      }, 1000);
+    } catch (error) {
+      console.error('[BatchJobMonitor] Error executing job:', error);
+      alert('Failed to execute job: ' + error.message);
     }
   }
 

@@ -55,17 +55,29 @@ A Chrome extension for managing Salesforce picklist configurations, field depend
   - Summary statistics (Total fields, Custom, Standard, Required)
   - Progress indicator for bulk exports
   - CSV export with BOM for Excel compatibility
+  - **Field Usage Analytics** ⭐ NEW in v1.6.0
+    - On-demand data usage analysis showing how many records have values in each field
+    - Counts actual record usage (non-null, non-empty values) across up to 2,000 records per object
+    - Identifies unused fields (0 records with values) for potential cleanup
+    - Tooltip shows exact count of records using each field
+    - Sort by usage count to prioritize field management
+    - Progressive loading with per-object progress tracking
   - Full dark mode support
 - **Org Compare Tool**: Configuration drift detection between Salesforce orgs
   - **Multi-session support**: Detects ALL active Salesforce sessions across browser tabs
   - Select any two orgs from all available sessions for comparison
-  - Compare 6 metadata types:
+  - Compare 7 metadata types:
     - Objects (custom fields, relationships)
     - Fields (metadata, properties)
     - Validation Rules (formulas, active status)
     - Flows (active/inactive, versions)
     - Picklists (values, default values)
     - Dependencies (field dependencies)
+    - **Permissions** ⭐ NEW in v1.6.0
+      - Compare Profiles and Permission Sets across orgs
+      - Object permissions (Create, Read, Edit, Delete, View All, Modify All)
+      - Field permissions (Read, Edit)
+      - Select permission type (Profile/Permission Set) and specific item
   - Side-by-side comparison view with color-coded differences:
     - Green: Match
     - Yellow: Different
@@ -87,7 +99,7 @@ A Chrome extension for managing Salesforce picklist configurations, field depend
   - Import preview for permission data (preview only, no deployment)
   - Full dark mode support
 - **Validation Rules Manager**: Comprehensive validation rule management
-  - View all validation rules across all objects
+  - View all validation rules across all objects with correct object labels ⭐ FIXED in v1.6.0
   - Filter by object, status (active/inactive), search by name/formula/error message
   - Bulk enable/disable validation rules (useful during migrations)
   - Export to CSV or JSON format
@@ -101,6 +113,11 @@ A Chrome extension for managing Salesforce picklist configurations, field depend
   - Summary stats dashboard (Active, Queued, Completed, Failed)
   - Job progress bars with percentage and item counts
   - Quick abort capability for running jobs
+  - **Execute Scheduled Jobs Now** ⭐ NEW in v1.6.0
+    - Run scheduled batch jobs on-demand with one click
+    - Confirmation dialog showing class name and next scheduled run
+    - Maintains scheduled job configuration (doesn't delete schedule)
+    - Auto-refresh and switch to Active Jobs tab after execution
   - Filter by job type and status
   - Search by Apex class name
   - Auto-refresh with configurable interval (15s, 30s, 1m, 2m, 5m)

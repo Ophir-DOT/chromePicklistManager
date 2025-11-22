@@ -16,8 +16,6 @@ class ValidationRuleAPI {
    * @returns {Promise<Array>} Array of validation rule records
    */
   static async getValidationRules(options = {}) {
-    console.log('[ValidationRuleAPI] Getting ValidationRule records', options);
-
     const { objectName, activeOnly, searchTerm, limit = 200 } = options;
 
     // Build WHERE clause
@@ -49,17 +47,32 @@ class ValidationRuleAPI {
 
     const endpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(query)}`;
 
-    console.log('[ValidationRuleAPI] Query:', query);
-    console.log('[ValidationRuleAPI] Endpoint:', endpoint);
-
-    try {
+    try{
       const response = await SalesforceAPI.callAPI(endpoint);
       let rules = response.records || [];
 
+      // Fetch object labels for all EntityDefinitionIds
+      const entityIds = [...new Set(rules.map(r => r.EntityDefinitionId).filter(Boolean))];
+      let entityLabels = new Map();
+
+      if (entityIds.length > 0) {
+        entityLabels = await this.getEntityDefinitionLabels(entityIds);
+      }
+
+      // Enrich rules with object labels and API names
+      rules = rules.map(rule => {
+        const entityData = entityLabels.get(rule.EntityDefinitionId);
+        return {
+          ...rule,
+          ObjectLabel: entityData?.label || rule.EntityDefinitionId,
+          ObjectApiName: entityData?.apiName || rule.EntityDefinitionId
+        };
+      });
+
       // Apply objectName filter on client side (Tooling API 500s on relationship field traversal)
-      // EntityDefinitionId is the object API name (e.g., "Account", "Custom__c")
+      // Filter by ObjectApiName (the actual API name from EntityDefinition)
       if (objectName) {
-        rules = rules.filter(rule => rule.EntityDefinitionId === objectName);
+        rules = rules.filter(rule => rule.ObjectApiName === objectName);
       }
 
       // Apply search filter on client side (Tooling API doesn't support LIKE on all fields)
@@ -70,11 +83,11 @@ class ValidationRuleAPI {
           return rule.ValidationName?.toLowerCase().includes(term) ||
             rule.ErrorMessage?.toLowerCase().includes(term) ||
             rule.Description?.toLowerCase().includes(term) ||
-            rule.EntityDefinitionId?.toLowerCase().includes(term);
+            rule.ObjectLabel?.toLowerCase().includes(term) ||
+            rule.ObjectApiName?.toLowerCase().includes(term);
         });
       }
 
-      console.log('[ValidationRuleAPI] Found', rules.length, 'validation rules');
       return rules;
     } catch (error) {
       console.error('[ValidationRuleAPI] Error querying validation rules:', error);
@@ -88,24 +101,21 @@ class ValidationRuleAPI {
    * @returns {Promise<object>} Object grouped by SObject name
    */
   static async getValidationRulesByObject(options = {}) {
-    console.log('[ValidationRuleAPI] Getting validation rules grouped by object');
-
     const rules = await this.getValidationRules(options);
 
     const grouped = {};
     rules.forEach(rule => {
-      const objectName = rule.EntityDefinition?.QualifiedApiName || 'Unknown';
+      const objectName = rule.ObjectApiName || 'Unknown';
       if (!grouped[objectName]) {
         grouped[objectName] = {
           objectName: objectName,
-          objectLabel: rule.EntityDefinition?.Label || objectName,
+          objectLabel: rule.ObjectLabel || objectName,
           rules: []
         };
       }
       grouped[objectName].rules.push(rule);
     });
 
-    console.log('[ValidationRuleAPI] Grouped into', Object.keys(grouped).length, 'objects');
     return grouped;
   }
 
@@ -115,8 +125,6 @@ class ValidationRuleAPI {
    * @returns {Promise<object>} Validation rule record
    */
   static async getValidationRule(ruleId) {
-    console.log('[ValidationRuleAPI] Getting validation rule', ruleId);
-
     const query = `
       SELECT Id, ValidationName, Active, Description,
              ErrorDisplayField, ErrorMessage, EntityDefinitionId,
@@ -128,15 +136,11 @@ class ValidationRuleAPI {
 
     const endpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(query)}`;
 
-    console.log('[ValidationRuleAPI] Query:', query);
-    console.log('[ValidationRuleAPI] Endpoint:', endpoint);
-
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
       if (!response.records || response.records.length === 0) {
         throw new Error(`Validation rule not found: ${ruleId}`);
       }
-      console.log('[ValidationRuleAPI] Found validation rule:', response.records[0].ValidationName);
       return response.records[0];
     } catch (error) {
       console.error('[ValidationRuleAPI] Error getting validation rule:', error);
@@ -152,8 +156,6 @@ class ValidationRuleAPI {
    * @returns {Promise<Array>} Rules with Metadata populated
    */
   static async fetchMetadataForRules(rules, progressCallback = null) {
-    console.log('[ValidationRuleAPI] Fetching Metadata for', rules.length, 'rules');
-
     const rulesWithMetadata = [];
 
     for (let i = 0; i < rules.length; i++) {
@@ -179,7 +181,6 @@ class ValidationRuleAPI {
       }
     }
 
-    console.log('[ValidationRuleAPI] Fetched Metadata for', rulesWithMetadata.length, 'rules');
     return rulesWithMetadata;
   }
 
@@ -188,8 +189,6 @@ class ValidationRuleAPI {
    * @returns {Promise<object>} Summary statistics
    */
   static async getValidationRuleSummary() {
-    console.log('[ValidationRuleAPI] Getting validation rule summary');
-
     try {
       // Query all rules and calculate counts client-side
       // Tooling API has limited support for aggregate functions
@@ -199,9 +198,6 @@ class ValidationRuleAPI {
       `;
 
       const endpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(query)}`;
-
-      console.log('[ValidationRuleAPI] Query:', query);
-      console.log('[ValidationRuleAPI] Endpoint:', endpoint);
 
       const response = await SalesforceAPI.callAPI(endpoint);
 
@@ -230,7 +226,6 @@ class ValidationRuleAPI {
         summary.objectCount = objectIds.size;
       }
 
-      console.log('[ValidationRuleAPI] Summary:', summary);
       return summary;
     } catch (error) {
       console.error('[ValidationRuleAPI] Error getting summary:', error);
@@ -243,8 +238,6 @@ class ValidationRuleAPI {
    * @returns {Promise<Array>} Array of object names
    */
   static async getObjectsWithValidationRules() {
-    console.log('[ValidationRuleAPI] Getting objects with validation rules');
-
     // Query all rules and aggregate client-side
     // Avoiding relationship fields that cause 500 errors
     const query = `
@@ -253,9 +246,6 @@ class ValidationRuleAPI {
     `;
 
     const endpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(query)}`;
-
-    console.log('[ValidationRuleAPI] Query:', query);
-    console.log('[ValidationRuleAPI] Endpoint:', endpoint);
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
@@ -282,14 +272,15 @@ class ValidationRuleAPI {
       // Fetch labels for all objects using EntityDefinition IDs
       const entityIds = Array.from(objectMap.keys());
       if (entityIds.length > 0) {
-        const entityData = await this.getEntityDefinitionLabels(entityIds);
+        const entityLabels = await this.getEntityDefinitionLabels(entityIds);
 
         // Update the map with actual labels and API names
-        entityData.forEach((data, entityId) => {
+        // Map.forEach receives (value, key) as parameters
+        entityLabels.forEach((labelData, entityId) => {
           if (objectMap.has(entityId)) {
             const obj = objectMap.get(entityId);
-            obj.label = data.label;
-            obj.apiName = data.apiName;
+            obj.label = labelData.label;
+            obj.apiName = labelData.apiName;
           }
         });
       }
@@ -298,7 +289,6 @@ class ValidationRuleAPI {
       const objects = Array.from(objectMap.values())
         .sort((a, b) => a.label.localeCompare(b.label));
 
-      console.log('[ValidationRuleAPI] Found', objects.length, 'objects with validation rules');
       return objects;
     } catch (error) {
       console.error('[ValidationRuleAPI] Error getting objects:', error);
@@ -312,36 +302,30 @@ class ValidationRuleAPI {
    * @returns {Promise<Map>} Map of entityId -> {label, apiName}
    */
   static async getEntityDefinitionLabels(entityIds) {
-    console.log('[ValidationRuleAPI] Getting labels for', entityIds.length, 'objects');
-
     // Build IN clause for the query - EntityDefinitionId is the record ID
     const inClause = entityIds.map(id => `'${id}'`).join(',');
 
     const query = `
-      SELECT Id, QualifiedApiName, Label
+      SELECT DurableId, QualifiedApiName, Label
       FROM EntityDefinition
-      WHERE Id IN (${inClause})
+      WHERE DurableId IN (${inClause})
     `;
 
     // EntityDefinition is queried via regular REST API, not Tooling API
     const endpoint = `/services/data/v59.0/query/?q=${encodeURIComponent(query)}`;
-
-    console.log('[ValidationRuleAPI] Query:', query);
-    console.log('[ValidationRuleAPI] Endpoint:', endpoint);
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
 
       const labelMap = new Map();
       response.records?.forEach(record => {
-        // Map the EntityDefinition ID to both label and API name
-        labelMap.set(record.Id, {
+        // Map the EntityDefinition DurableId to both label and API name
+        labelMap.set(record.DurableId, {
           label: record.Label,
           apiName: record.QualifiedApiName
         });
       });
 
-      console.log('[ValidationRuleAPI] Retrieved labels for', labelMap.size, 'objects');
       return labelMap;
     } catch (error) {
       console.error('[ValidationRuleAPI] Error getting entity labels:', error);
@@ -357,8 +341,6 @@ class ValidationRuleAPI {
    * @returns {Promise<object>} Result of update operation
    */
   static async updateValidationRuleStatus(ruleId, active) {
-    console.log('[ValidationRuleAPI] Updating validation rule', ruleId, 'to', active ? 'Active' : 'Inactive');
-
     // First get the full rule metadata
     const rule = await this.getValidationRule(ruleId);
 
@@ -382,7 +364,6 @@ class ValidationRuleAPI {
         }
       });
 
-      console.log('[ValidationRuleAPI] Successfully updated validation rule');
       return { success: true, ruleId, active };
     } catch (error) {
       console.error('[ValidationRuleAPI] Error updating validation rule:', error);
@@ -396,8 +377,6 @@ class ValidationRuleAPI {
    * @returns {Promise<object>} Results of bulk update
    */
   static async bulkUpdateValidationRuleStatus(ruleUpdates) {
-    console.log('[ValidationRuleAPI] Bulk updating', ruleUpdates.length, 'validation rules');
-
     const results = {
       success: [],
       errors: []
@@ -417,7 +396,6 @@ class ValidationRuleAPI {
       }
     }
 
-    console.log('[ValidationRuleAPI] Bulk update complete:', results.success.length, 'success,', results.errors.length, 'errors');
     return results;
   }
 
@@ -427,8 +405,6 @@ class ValidationRuleAPI {
    * @returns {string} JSON string
    */
   static exportToJSON(rules) {
-    console.log('[ValidationRuleAPI] Exporting', rules.length, 'rules to JSON');
-
     const exportData = rules.map(rule => ({
       id: rule.Id,
       name: rule.ValidationName,
@@ -453,8 +429,6 @@ class ValidationRuleAPI {
    * @returns {string} CSV string
    */
   static exportToCSV(rules) {
-    console.log('[ValidationRuleAPI] Exporting', rules.length, 'rules to CSV');
-
     const headers = [
       'Object API Name',
       'Object Label',
@@ -542,8 +516,6 @@ class ValidationRuleAPI {
    * @returns {object} Test result with pass/fail and explanation
    */
   static testFormula(formula, record) {
-    console.log('[ValidationRuleAPI] Testing formula against record');
-
     try {
       // This is a simplified formula evaluator
       // For production, you'd want to use Salesforce's formula evaluation API
@@ -623,9 +595,10 @@ class ValidationRuleAPI {
     // Extract formula from Metadata compound field if available
     const formula = rule.Metadata?.errorConditionFormula || '';
 
-    // Handle both relationship fields and EntityDefinitionId
-    const objectName = rule.EntityDefinition?.QualifiedApiName || rule.EntityDefinitionId || 'Unknown';
-    const objectLabel = rule.EntityDefinition?.Label || rule.EntityDefinitionId || 'Unknown';
+    // Use ObjectLabel and ObjectApiName if available (from getValidationRules enrichment)
+    // Otherwise fall back to EntityDefinition relationship or EntityDefinitionId
+    const objectName = rule.ObjectApiName || rule.EntityDefinition?.QualifiedApiName || rule.EntityDefinitionId || 'Unknown';
+    const objectLabel = rule.ObjectLabel || rule.EntityDefinition?.Label || rule.EntityDefinitionId || 'Unknown';
 
     return {
       id: rule.Id,
@@ -671,8 +644,6 @@ class ValidationRuleAPI {
    * @returns {object} Analysis results
    */
   static analyzeRules(rules) {
-    console.log('[ValidationRuleAPI] Analyzing', rules.length, 'validation rules');
-
     const analysis = {
       totalRules: rules.length,
       activeRules: 0,
@@ -732,7 +703,6 @@ class ValidationRuleAPI {
       analysis.warnings.push('More inactive rules than active - consider cleanup');
     }
 
-    console.log('[ValidationRuleAPI] Analysis complete:', analysis);
     return analysis;
   }
 }

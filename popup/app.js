@@ -31,11 +31,24 @@ let currentPageContext = null;
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize theme first for smooth UX
   await ThemeManager.initTheme();
+
+  // Display version from manifest
+  displayVersion();
+
   await checkConnection();
   await checkForUpdates();
   await updateCheckShareFilesButton();
   setupEventListeners();
 });
+
+// Display version from manifest.json
+function displayVersion() {
+  const manifest = chrome.runtime.getManifest();
+  const versionElement = document.querySelector('footer small');
+  if (versionElement) {
+    versionElement.textContent = `v${manifest.version}`;
+  }
+}
 
 async function checkConnection() {
   const statusIndicator = document.querySelector('.status-indicator');

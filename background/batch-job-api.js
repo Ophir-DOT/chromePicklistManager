@@ -15,7 +15,6 @@ class BatchJobAPI {
    * @returns {Promise<Array>} Array of job records
    */
   static async getAsyncApexJobs(options = {}) {
-    console.log('[BatchJobAPI] Getting AsyncApexJob records', options);
 
     const { status, jobType, limit = 50, orderBy = 'CreatedDate DESC' } = options;
 
@@ -49,7 +48,6 @@ class BatchJobAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[BatchJobAPI] Found', response.records?.length || 0, 'jobs');
       return response.records || [];
     } catch (error) {
       console.error('[BatchJobAPI] Error querying jobs:', error);
@@ -64,7 +62,6 @@ class BatchJobAPI {
    * @returns {Promise<Array>} Array of active job records
    */
   static async getActiveJobs(limit = 50, classNames = null) {
-    console.log('[BatchJobAPI] Getting active jobs');
 
     let classFilter = '';
     if (classNames && classNames.length > 0) {
@@ -87,7 +84,6 @@ class BatchJobAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[BatchJobAPI] Found', response.records?.length || 0, 'active jobs');
       return response.records || [];
     } catch (error) {
       console.error('[BatchJobAPI] Error querying active jobs:', error);
@@ -103,7 +99,6 @@ class BatchJobAPI {
    * @returns {Promise<Array>} Array of completed job records
    */
   static async getRecentCompletedJobs(hours = 24, limit = 50, classNames = null) {
-    console.log('[BatchJobAPI] Getting recent completed jobs');
 
     // Calculate date threshold
     const threshold = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -131,7 +126,6 @@ class BatchJobAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[BatchJobAPI] Found', response.records?.length || 0, 'completed jobs');
       return response.records || [];
     } catch (error) {
       console.error('[BatchJobAPI] Error querying completed jobs:', error);
@@ -145,7 +139,6 @@ class BatchJobAPI {
    * @returns {Promise<object>} Object with active and completed job arrays
    */
   static async getAllJobs(limit = 25) {
-    console.log('[BatchJobAPI] Getting all jobs');
 
     try {
       // Run both queries in parallel
@@ -170,7 +163,6 @@ class BatchJobAPI {
    * @returns {Promise<object>} Result of abort operation
    */
   static async abortJob(jobId) {
-    console.log('[BatchJobAPI] Aborting job', jobId);
 
     // Use SOQL to get the job's JobType first
     const query = `SELECT Id, JobType, Status FROM AsyncApexJob WHERE Id = '${jobId}'`;
@@ -200,7 +192,6 @@ class BatchJobAPI {
       const response = await SalesforceAPI.callAPI(executeEndpoint);
 
       if (response.success) {
-        console.log('[BatchJobAPI] Job aborted successfully');
         return { success: true, jobId };
       } else {
         throw new Error(response.compileProblem || response.exceptionMessage || 'Unknown error');
@@ -217,7 +208,6 @@ class BatchJobAPI {
    * @returns {Promise<Array>} Array of scheduled job records
    */
   static async getScheduledJobs(limit = 50) {
-    console.log('[BatchJobAPI] Getting scheduled jobs');
 
     const query = `
       SELECT Id, CronJobDetail.Name, CronJobDetail.JobType, State,
@@ -233,10 +223,64 @@ class BatchJobAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[BatchJobAPI] Found', response.records?.length || 0, 'scheduled jobs');
       return response.records || [];
     } catch (error) {
       console.error('[BatchJobAPI] Error querying scheduled jobs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute a scheduled job immediately
+   * @param {string} cronTriggerId - The CronTrigger Id
+   * @param {string} className - The Apex class name to execute
+   * @param {number} batchSize - Optional batch size (default 200)
+   * @returns {Promise<object>} Result with new job ID
+   */
+  static async executeScheduledJobNow(cronTriggerId, className, batchSize = 200) {
+
+    try {
+      // Use Database.executeBatch to run the batch job immediately
+      const executeCode = `
+        ${className} batchJob = new ${className}();
+        Id jobId = Database.executeBatch(batchJob, ${batchSize});
+        System.debug('Started batch job: ' + jobId);
+      `;
+
+      const endpoint = '/services/data/v59.0/tooling/executeAnonymous/?anonymousBody=' +
+        encodeURIComponent(executeCode);
+
+      const response = await SalesforceAPI.callAPI(endpoint);
+
+      if (response.success) {
+
+        // The debug log contains the job ID, but we need to query for the most recent job
+        // for this class to get the actual ID
+        const query = `
+          SELECT Id
+          FROM AsyncApexJob
+          WHERE ApexClass.Name = '${className}'
+          ORDER BY CreatedDate DESC
+          LIMIT 1
+        `;
+
+        const queryEndpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(query)}`;
+        const jobResponse = await SalesforceAPI.callAPI(queryEndpoint);
+
+        const jobId = jobResponse.records?.[0]?.Id || null;
+
+        return {
+          success: true,
+          className,
+          jobId,
+          message: `Batch job ${className} started successfully`
+        };
+      } else {
+        const errorMessage = response.compileProblem || response.exceptionMessage || 'Unknown error';
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('[BatchJobAPI] Error executing scheduled job:', error);
       throw error;
     }
   }
@@ -247,7 +291,6 @@ class BatchJobAPI {
    * @returns {Promise<Array>} Array of deployment records
    */
   static async getDeployments(deploymentId = null) {
-    console.log('[BatchJobAPI] Getting deployments');
 
     let query = `
       SELECT Id, Status, StartDate, CompletedDate,
@@ -267,7 +310,6 @@ class BatchJobAPI {
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint);
-      console.log('[BatchJobAPI] Found', response.records?.length || 0, 'deployments');
       return response.records || [];
     } catch (error) {
       console.error('[BatchJobAPI] Error querying deployments:', error);
@@ -280,7 +322,6 @@ class BatchJobAPI {
    * @returns {Promise<object>} Summary statistics
    */
   static async getJobSummary() {
-    console.log('[BatchJobAPI] Getting job summary');
 
     try {
       // Get counts by status
@@ -313,7 +354,6 @@ class BatchJobAPI {
         });
       }
 
-      console.log('[BatchJobAPI] Job summary:', summary);
       return summary;
     } catch (error) {
       console.error('[BatchJobAPI] Error getting job summary:', error);

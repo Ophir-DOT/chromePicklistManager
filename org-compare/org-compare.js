@@ -37,6 +37,10 @@ function setupEventListeners() {
   // Object/Field selectors
   document.getElementById('objectSelect').addEventListener('change', handleObjectSelectChange);
 
+  // Permission selectors
+  document.getElementById('permissionTypeSelect').addEventListener('change', handlePermissionTypeChange);
+  document.getElementById('permissionItemSelect').addEventListener('change', updateCompareButtonState);
+
   // Compare button
   document.getElementById('compareBtn').addEventListener('click', runComparison);
 
@@ -157,9 +161,11 @@ function handleMetadataTypeChange() {
     ['fields', 'picklists', 'dependencies'].includes(t)
   );
   const needsFieldSelector = selectedTypes.includes('picklists');
+  const needsPermissionSelector = selectedTypes.includes('permissions');
 
   const selectorContainer = document.getElementById('objectFieldSelector');
   const fieldSelectorContainer = document.getElementById('fieldSelectorContainer');
+  const permissionSelector = document.getElementById('permissionSelector');
 
   if (needsObjectSelector) {
     selectorContainer.classList.remove('hidden');
@@ -172,6 +178,12 @@ function handleMetadataTypeChange() {
     fieldSelectorContainer.style.display = 'block';
   } else {
     fieldSelectorContainer.style.display = 'none';
+  }
+
+  if (needsPermissionSelector) {
+    permissionSelector.classList.remove('hidden');
+  } else {
+    permissionSelector.classList.add('hidden');
   }
 
   updateCompareButtonState();
@@ -257,6 +269,47 @@ async function handleObjectSelectChange(e) {
   updateCompareButtonState();
 }
 
+async function handlePermissionTypeChange(e) {
+  const permissionType = e.target.value;
+  const permissionItemContainer = document.getElementById('permissionItemContainer');
+  const permissionItemSelect = document.getElementById('permissionItemSelect');
+
+  if (!permissionType || !sourceSession) {
+    permissionItemContainer.style.display = 'none';
+    permissionItemSelect.innerHTML = '<option value="">-- Select Item --</option>';
+    return;
+  }
+
+  try {
+    permissionItemContainer.style.display = 'block';
+    permissionItemSelect.innerHTML = '<option value="">Loading...</option>';
+
+    let items;
+    if (permissionType === 'Profile') {
+      items = await OrgCompareAPI.getProfiles(sourceSession);
+    } else if (permissionType === 'PermissionSet') {
+      items = await OrgCompareAPI.getPermissionSets(sourceSession);
+    }
+
+    permissionItemSelect.innerHTML = '<option value="">-- Select Item --</option>';
+    items.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.label || item.name;
+      option.dataset.name = item.name;
+      permissionItemSelect.appendChild(option);
+    });
+
+    console.log('[OrgCompare] Loaded', items.length, permissionType + 's');
+
+  } catch (error) {
+    console.error('[OrgCompare] Error loading permission items:', error);
+    permissionItemSelect.innerHTML = '<option value="">Error loading items</option>';
+  }
+
+  updateCompareButtonState();
+}
+
 function updateCompareButtonState() {
   const compareBtn = document.getElementById('compareBtn');
   const selectedTypes = getSelectedMetadataTypes();
@@ -266,6 +319,15 @@ function updateCompareButtonState() {
 
   // Object/field selection is now OPTIONAL - used as filters, not requirements
   // Users can compare all fields/picklists across all objects, or filter to a specific object
+
+  // Check if permissions is selected - requires permission type and item selection
+  if (selectedTypes.includes('permissions')) {
+    const permissionType = document.getElementById('permissionTypeSelect').value;
+    const permissionItem = document.getElementById('permissionItemSelect').value;
+    if (!permissionType || !permissionItem) {
+      canCompare = false;
+    }
+  }
 
   // Check source and target are different
   if (sourceSession && targetSession && sourceSession.orgId === targetSession.orgId) {
@@ -293,7 +355,9 @@ async function runComparison() {
     const selectedTypes = getSelectedMetadataTypes();
     const options = {
       objectName: document.getElementById('objectSelect').value || null,
-      fieldName: document.getElementById('fieldSelect').value || null
+      fieldName: document.getElementById('fieldSelect').value || null,
+      permissionType: document.getElementById('permissionTypeSelect').value || null,
+      permissionId: document.getElementById('permissionItemSelect').value || null
     };
 
     console.log('[OrgCompare] Running comparison:', selectedTypes, options);
@@ -351,7 +415,8 @@ function updateTypeFilter(types) {
     validationRules: 'Validation Rules',
     flows: 'Flows',
     picklists: 'Picklists',
-    dependencies: 'Dependencies'
+    dependencies: 'Dependencies',
+    permissions: 'Permissions'
   };
 
   types.forEach(type => {
@@ -383,7 +448,8 @@ function createComparisonSection(metadataType, comparison) {
     validationRules: 'Validation Rules',
     flows: 'Flows',
     picklists: 'Picklists',
-    dependencies: 'Dependencies'
+    dependencies: 'Dependencies',
+    permissions: 'Permissions'
   };
 
   const typeIcons = {
@@ -392,7 +458,8 @@ function createComparisonSection(metadataType, comparison) {
     validationRules: 'rule',
     flows: 'account_tree',
     picklists: 'list',
-    dependencies: 'link'
+    dependencies: 'link',
+    permissions: 'admin_panel_settings'
   };
 
   // Header

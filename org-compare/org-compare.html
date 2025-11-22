@@ -135,6 +135,42 @@
           </span>
           <span class="checkbox-description">Field dependencies, filters</span>
         </label>
+
+        <label class="metadata-checkbox">
+          <input type="checkbox" name="metadataType" value="permissions">
+          <span class="checkbox-label">
+            <span class="material-symbols-rounded">admin_panel_settings</span>
+            Permissions
+          </span>
+          <span class="checkbox-description">Profile/Permission Set permissions</span>
+        </label>
+      </div>
+
+      <!-- Permission Selector (for permission comparison) -->
+      <div id="permissionSelector" class="permission-selector hidden">
+        <p class="selector-hint">Select a Profile or Permission Set to compare permissions between orgs</p>
+        <div class="selector-row">
+          <div class="selector-item">
+            <label for="permissionTypeSelect">
+              <span class="material-symbols-rounded">category</span>
+              Permission Type
+            </label>
+            <select id="permissionTypeSelect">
+              <option value="">-- Select Type --</option>
+              <option value="Profile">Profile</option>
+              <option value="PermissionSet">Permission Set</option>
+            </select>
+          </div>
+          <div class="selector-item" id="permissionItemContainer" style="display: none;">
+            <label for="permissionItemSelect">
+              <span class="material-symbols-rounded">badge</span>
+              Profile/Permission Set
+            </label>
+            <select id="permissionItemSelect">
+              <option value="">-- Select Item --</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- Object/Field Selection (optional filters for specific comparisons) -->

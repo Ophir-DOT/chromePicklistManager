@@ -610,6 +610,11 @@ body {
   text-align: center;
 }
 
+.col-usage {
+  width: 100px;
+  text-align: center;
+}
+
 .fields-table input[type="checkbox"] {
   accent-color: var(--brand-color-cta);
 }
@@ -630,6 +635,78 @@ body {
 .badge-custom {
   background: var(--color-info-bg);
   color: var(--color-info-text);
+}
+
+/* Usage badges */
+.usage-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--border-radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  cursor: help;
+}
+
+.usage-unused {
+  background: var(--brand-color-neutral-light);
+  color: var(--brand-color-neutral-med);
+}
+
+.usage-low {
+  background: #E3F2FD;
+  color: #1976D2;
+}
+
+.usage-medium {
+  background: #FFF3E0;
+  color: #F57C00;
+}
+
+.usage-high {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+.usage-not-loaded {
+  color: var(--brand-color-neutral-med);
+  font-size: var(--font-size-sm);
+}
+
+/* Usage Analytics Section */
+.usage-analytics-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.usage-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.usage-progress .progress-bar {
+  height: 8px;
+  background: var(--brand-color-neutral-light);
+  border-radius: var(--border-radius-pill);
+  overflow: hidden;
+  position: relative;
+}
+
+.usage-progress .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand-color-cta) 0%, var(--brand-color-secondary) 100%);
+  border-radius: var(--border-radius-pill);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+#usageProgressText {
+  font-size: var(--font-size-xs);
+  color: var(--brand-color-neutral-med);
 }
 
 /* Pagination */
@@ -890,4 +967,33 @@ body {
 [data-theme="dark"] .badge-custom {
   background: var(--color-info-bg);
   color: var(--color-info-text);
+}
+
+/* Dark mode usage badges */
+[data-theme="dark"] .usage-unused {
+  background: var(--brand-color-bg-tertiary);
+  color: var(--brand-color-text-muted);
+}
+
+[data-theme="dark"] .usage-low {
+  background: #1a237e;
+  color: #82b1ff;
+}
+
+[data-theme="dark"] .usage-medium {
+  background: #e65100;
+  color: #ffcc80;
+}
+
+[data-theme="dark"] .usage-high {
+  background: #b71c1c;
+  color: #ef9a9a;
+}
+
+[data-theme="dark"] .usage-progress .progress-bar {
+  background: var(--brand-color-bg-tertiary);
+}
+
+[data-theme="dark"] .usage-analytics-section {
+  border-top-color: var(--border-color-primary);
 }

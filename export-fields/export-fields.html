@@ -222,6 +222,20 @@
         </div>
       </div>
 
+      <!-- Usage Analytics Button -->
+      <div class="usage-analytics-section">
+        <button id="loadUsageBtn" class="btn btn-secondary" disabled>
+          <span class="material-symbols-rounded">analytics</span>
+          Load Usage Data
+        </button>
+        <div id="usageProgress" class="usage-progress hidden">
+          <div class="progress-bar">
+            <div class="progress-fill" id="usageProgressFill"></div>
+          </div>
+          <span id="usageProgressText">Analyzing field usage...</span>
+        </div>
+      </div>
+
       <!-- Preview Header -->
       <div class="preview-header">
         <h2>
@@ -273,6 +287,10 @@
               </th>
               <th class="col-custom sortable" data-sort="custom">
                 Custom
+                <span class="material-symbols-rounded sort-icon">unfold_more</span>
+              </th>
+              <th class="col-usage sortable" data-sort="usage">
+                Usage
                 <span class="material-symbols-rounded sort-icon">unfold_more</span>
               </th>
             </tr>
