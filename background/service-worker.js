@@ -4,6 +4,7 @@ import StorageManager from './storage-manager.js';
 import SalesforceAPI from './api-client.js';
 import UpdateChecker from './update-checker.js';
 import HealthCheckAPI from './health-check-api.js';
+import DeploymentHistoryAPI from './deployment-history-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -119,6 +120,44 @@ async function handleMessage(request, sender, sendResponse) {
           request.recordId
         );
         sendResponse({ success: true, data: addLinksResult });
+        break;
+
+      // Deployment History
+      case 'LOG_DEPLOYMENT':
+        await DeploymentHistoryAPI.logDeployment(request.payload);
+        sendResponse({ success: true });
+        break;
+
+      case 'GET_DEPLOYMENT_HISTORY':
+        const history = await DeploymentHistoryAPI.getDeploymentHistory(request.payload);
+        sendResponse({ success: true, data: history });
+        break;
+
+      case 'GET_DEPLOYMENT_DETAILS':
+        const details = await DeploymentHistoryAPI.getDeploymentDetails(request.payload.deploymentId);
+        sendResponse({ success: true, data: details });
+        break;
+
+      case 'DELETE_DEPLOYMENT':
+        await DeploymentHistoryAPI.deleteDeployment(request.payload.deploymentId);
+        sendResponse({ success: true });
+        break;
+
+      case 'CLEAR_DEPLOYMENT_HISTORY':
+        await DeploymentHistoryAPI.clearHistory();
+        sendResponse({ success: true });
+        break;
+
+      case 'EXPORT_DEPLOYMENT_HISTORY':
+        const exportData = request.payload.format === 'csv'
+          ? DeploymentHistoryAPI.exportToCSV(request.payload.history)
+          : DeploymentHistoryAPI.exportToJSON(request.payload.history);
+        sendResponse({ success: true, data: exportData });
+        break;
+
+      case 'GET_DEPLOYMENT_STATISTICS':
+        const stats = await DeploymentHistoryAPI.getStatistics(request.payload);
+        sendResponse({ success: true, data: stats });
         break;
 
       default:

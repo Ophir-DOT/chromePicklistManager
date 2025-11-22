@@ -108,6 +108,7 @@ function setupEventListeners() {
   document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
   document.getElementById('permissionComparisonBtn').addEventListener('click', handlePermissionComparison);
   document.getElementById('orgCompareBtn').addEventListener('click', handleOrgCompare);
+  document.getElementById('deploymentHistoryBtn').addEventListener('click', handleDeploymentHistory);
   document.getElementById('exportFieldsBtn').addEventListener('click', handleExportFields);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
@@ -1882,6 +1883,22 @@ function handleOrgCompare() {
   } catch (error) {
     console.error('[Popup] Failed to open Org Compare Tool:', error);
     alert(`Failed to open Org Compare Tool: ${error.message}`);
+  }
+}
+
+function handleDeploymentHistory() {
+  try {
+    console.log('[Popup] Opening Deployment History...');
+
+    const deploymentHistoryUrl = chrome.runtime.getURL('pages/deployment-history/deployment-history.html');
+
+    chrome.tabs.create({ url: deploymentHistoryUrl }, (tab) => {
+      console.log('[Popup] Deployment History opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Deployment History:', error);
+    alert(`Failed to open Deployment History: ${error.message}`);
   }
 }
 
