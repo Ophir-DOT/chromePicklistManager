@@ -1136,6 +1136,128 @@ class OrgCompareAPI {
       metadataTypes: Object.keys(results.comparisons).length
     };
   }
+
+  /**
+   * Get metadata as XML for display in XML viewer
+   * @param {object} session - Session object
+   * @param {Array} metadataTypes - Array of metadata types to retrieve
+   * @param {object} options - Options for metadata retrieval
+   * @returns {Promise<string>} XML string
+   */
+  static async getMetadataAsXml(session, metadataTypes, options = {}) {
+    let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xmlContent += '<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n';
+
+    for (const metadataType of metadataTypes) {
+      try {
+        const typeXml = await this.getMetadataTypeAsXml(session, metadataType, options);
+        xmlContent += typeXml;
+      } catch (error) {
+        console.error(`[OrgCompareAPI] Error getting XML for ${metadataType}:`, error);
+        xmlContent += `  <!-- Error retrieving ${metadataType}: ${error.message} -->\n`;
+      }
+    }
+
+    xmlContent += '  <version>59.0</version>\n';
+    xmlContent += '</Package>';
+
+    return xmlContent;
+  }
+
+  /**
+   * Get XML for a specific metadata type
+   * @param {object} session - Session object
+   * @param {string} metadataType - Metadata type
+   * @param {object} options - Options
+   * @returns {Promise<string>} XML string for this type
+   */
+  static async getMetadataTypeAsXml(session, metadataType, options) {
+    let xml = '';
+
+    switch (metadataType) {
+      case 'objects':
+        const objects = await this.getObjects(session);
+        xml += '  <types>\n';
+        objects.forEach(obj => {
+          if (obj.custom) {
+            xml += `    <members>${obj.name}</members>\n`;
+          }
+        });
+        xml += '    <name>CustomObject</name>\n';
+        xml += '  </types>\n';
+        break;
+
+      case 'fields':
+        if (options.objectName) {
+          const metadata = await this.getObjectMetadata(session, options.objectName);
+          xml += '  <types>\n';
+          metadata.fields.forEach(field => {
+            if (field.custom) {
+              xml += `    <members>${options.objectName}.${field.name}</members>\n`;
+            }
+          });
+          xml += '    <name>CustomField</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'validationRules':
+        const rules = await this.getValidationRules(session, options.objectName);
+        if (rules.length > 0) {
+          xml += '  <types>\n';
+          rules.forEach(rule => {
+            xml += `    <members>${rule.object}.${rule.name}</members>\n`;
+          });
+          xml += '    <name>ValidationRule</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'flows':
+        const flows = await this.getFlows(session);
+        if (flows.length > 0) {
+          xml += '  <types>\n';
+          flows.forEach(flow => {
+            xml += `    <members>${flow.name}</members>\n`;
+          });
+          xml += '    <name>Flow</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'permissions':
+        if (options.permissionType && options.permissionId) {
+          const perms = await this.getAllPermissions(session, options.permissionId, options.permissionType);
+          xml += '  <types>\n';
+
+          if (options.permissionType === 'Profile') {
+            // Get profile name
+            const profiles = await this.getProfiles(session);
+            const profile = profiles.find(p => p.id === options.permissionId);
+            if (profile) {
+              xml += `    <members>${profile.name}</members>\n`;
+            }
+            xml += '    <name>Profile</name>\n';
+          } else {
+            // Get permission set name
+            const permSets = await this.getPermissionSets(session);
+            const permSet = permSets.find(ps => ps.id === options.permissionId);
+            if (permSet) {
+              xml += `    <members>${permSet.name}</members>\n`;
+            }
+            xml += '    <name>PermissionSet</name>\n';
+          }
+
+          xml += '  </types>\n';
+        }
+        break;
+
+      default:
+        xml += `  <!-- ${metadataType} XML generation not implemented -->\n`;
+    }
+
+    return xml;
+  }
 }
 
 export default OrgCompareAPI;
