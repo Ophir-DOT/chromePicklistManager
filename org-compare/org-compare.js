@@ -587,6 +587,9 @@ function createComparisonItem(item) {
   sourceCol.innerHTML = `<h4>Source Org</h4>`;
 
   for (const [field, value] of Object.entries(item.sourceValues)) {
+    // Skip valueMappings - it has its own dedicated section
+    if (field === 'valueMappings') continue;
+
     const isDifferent = item.differences.includes(field);
     const valueClass = value === null ? 'null' : (isDifferent ? 'different' : '');
     const displayValue = value === null ? '(not present)' : formatValue(value);
@@ -606,6 +609,9 @@ function createComparisonItem(item) {
   targetCol.innerHTML = `<h4>Target Org</h4>`;
 
   for (const [field, value] of Object.entries(item.targetValues)) {
+    // Skip valueMappings - it has its own dedicated section
+    if (field === 'valueMappings') continue;
+
     const isDifferent = item.differences.includes(field);
     const valueClass = value === null ? 'null' : (isDifferent ? 'different' : '');
     const displayValue = value === null ? '(not present)' : formatValue(value);
@@ -622,6 +628,26 @@ function createComparisonItem(item) {
   itemDetails.appendChild(sourceCol);
   itemDetails.appendChild(targetCol);
 
+  // Add value mapping section for dependencies
+  // Show differences if they exist, OR show mappings for sourceOnly/targetOnly items
+  if (item.valueMappingDifferences && item.valueMappingDifferences.length > 0) {
+    const mappingSection = createValueMappingSection(item.valueMappingDifferences);
+    itemDetails.appendChild(mappingSection);
+  } else if (item.sourceValues && item.sourceValues.valueMappings !== undefined && item.sourceValues.valueMappings.length > 0) {
+    // Source only - show source mappings
+    const mappingSection = createSingleOrgMappingSection(item.sourceValues.valueMappings, 'Source Org');
+    itemDetails.appendChild(mappingSection);
+  } else if (item.targetValues && item.targetValues.valueMappings !== undefined && item.targetValues.valueMappings.length > 0) {
+    // Target only - show target mappings
+    const mappingSection = createSingleOrgMappingSection(item.targetValues.valueMappings, 'Target Org');
+    itemDetails.appendChild(mappingSection);
+  } else if ((item.sourceValues && item.sourceValues.valueMappings !== undefined) ||
+             (item.targetValues && item.targetValues.valueMappings !== undefined)) {
+    // Dependency exists but has no value mappings (e.g., controlling field not found)
+    const noMappingsSection = createNoMappingsSection();
+    itemDetails.appendChild(noMappingsSection);
+  }
+
   // Add click handler to toggle details
   itemHeader.addEventListener('click', () => {
     itemDetails.classList.toggle('collapsed');
@@ -633,6 +659,147 @@ function createComparisonItem(item) {
   div.appendChild(itemDetails);
 
   return div;
+}
+
+function createValueMappingSection(valueMappingDifferences) {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const header = document.createElement('h4');
+  header.className = 'value-mapping-header';
+  header.innerHTML = `
+    <span class="material-symbols-rounded">compare_arrows</span>
+    Controlling → Dependent Value Mappings (${valueMappingDifferences.length} difference${valueMappingDifferences.length !== 1 ? 's' : ''})
+  `;
+  section.appendChild(header);
+
+  const mappingList = document.createElement('div');
+  mappingList.className = 'value-mapping-list';
+
+  valueMappingDifferences.forEach(diff => {
+    const mappingItem = document.createElement('div');
+    mappingItem.className = 'value-mapping-item';
+
+    // Controlling value header
+    const controllingHeader = document.createElement('div');
+    controllingHeader.className = 'controlling-value-header';
+    controllingHeader.innerHTML = `
+      <span class="material-symbols-rounded">arrow_right</span>
+      <strong>When "${escapeHtml(diff.controllingValue)}"</strong> is selected:
+    `;
+    mappingItem.appendChild(controllingHeader);
+
+    // Value differences
+    const diffContainer = document.createElement('div');
+    diffContainer.className = 'value-diff-container';
+
+    // Only in source (removed values)
+    if (diff.onlyInSource.length > 0) {
+      const sourceOnlyDiv = document.createElement('div');
+      sourceOnlyDiv.className = 'value-diff source-only';
+      sourceOnlyDiv.innerHTML = `
+        <span class="diff-label">
+          <span class="material-symbols-rounded">remove_circle</span>
+          Only in Source (${diff.onlyInSource.length}):
+        </span>
+        <span class="diff-values">${diff.onlyInSource.map(v => escapeHtml(v)).join(', ')}</span>
+      `;
+      diffContainer.appendChild(sourceOnlyDiv);
+    }
+
+    // Only in target (added values)
+    if (diff.onlyInTarget.length > 0) {
+      const targetOnlyDiv = document.createElement('div');
+      targetOnlyDiv.className = 'value-diff target-only';
+      targetOnlyDiv.innerHTML = `
+        <span class="diff-label">
+          <span class="material-symbols-rounded">add_circle</span>
+          Only in Target (${diff.onlyInTarget.length}):
+        </span>
+        <span class="diff-values">${diff.onlyInTarget.map(v => escapeHtml(v)).join(', ')}</span>
+      `;
+      diffContainer.appendChild(targetOnlyDiv);
+    }
+
+    // Count summary
+    const countSummary = document.createElement('div');
+    countSummary.className = 'value-count-summary';
+    countSummary.innerHTML = `
+      <span>Source: ${diff.sourceCount} value${diff.sourceCount !== 1 ? 's' : ''}</span>
+      <span class="count-separator">|</span>
+      <span>Target: ${diff.targetCount} value${diff.targetCount !== 1 ? 's' : ''}</span>
+    `;
+    diffContainer.appendChild(countSummary);
+
+    mappingItem.appendChild(diffContainer);
+    mappingList.appendChild(mappingItem);
+  });
+
+  section.appendChild(mappingList);
+  return section;
+}
+
+function createSingleOrgMappingSection(valueMappings, orgLabel) {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const header = document.createElement('h4');
+  header.className = 'value-mapping-header';
+  header.innerHTML = `
+    <span class="material-symbols-rounded">arrow_forward</span>
+    Controlling → Dependent Value Mappings (${orgLabel})
+  `;
+  section.appendChild(header);
+
+  const mappingList = document.createElement('div');
+  mappingList.className = 'value-mapping-list';
+
+  valueMappings.forEach(mapping => {
+    const mappingItem = document.createElement('div');
+    mappingItem.className = 'value-mapping-item';
+
+    // Controlling value header
+    const controllingHeader = document.createElement('div');
+    controllingHeader.className = 'controlling-value-header';
+    controllingHeader.innerHTML = `
+      <span class="material-symbols-rounded">arrow_right</span>
+      <strong>When "${escapeHtml(mapping.controllingValue)}"</strong> is selected:
+    `;
+    mappingItem.appendChild(controllingHeader);
+
+    // Dependent values list
+    const valuesList = document.createElement('div');
+    valuesList.className = 'value-diff-container';
+
+    const valuesDiv = document.createElement('div');
+    valuesDiv.className = 'value-diff-values-only';
+    valuesDiv.innerHTML = `
+      <span class="values-label">Enabled values (${mapping.dependentValues.length}):</span>
+      <span class="values-list">${mapping.dependentValues.map(v => escapeHtml(v.value)).join(', ')}</span>
+    `;
+    valuesList.appendChild(valuesDiv);
+
+    mappingItem.appendChild(valuesList);
+    mappingList.appendChild(mappingItem);
+  });
+
+  section.appendChild(mappingList);
+  return section;
+}
+
+function createNoMappingsSection() {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const message = document.createElement('div');
+  message.className = 'no-mappings-message';
+  message.innerHTML = `
+    <span class="material-symbols-rounded">info</span>
+    <p>No value mappings available. This may occur if the controlling field could not be found or does not have picklist values configured.</p>
+  `;
+  section.appendChild(message);
+
+  return section;
 }
 
 function formatValue(value) {

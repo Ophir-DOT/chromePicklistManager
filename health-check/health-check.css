@@ -117,13 +117,13 @@ body {
 
 .meta-item {
   font-family: var(--font-family-body);
-  color: var(--brand-color-neutral-med);
+  color: #6B5B7B;
 }
 
 .meta-item strong {
   font-family: var(--font-family-headline);
   font-weight: 700;
-  color: var(--brand-color-primary);
+  color: #270648;
   margin-right: 5px;
 }
 
@@ -353,14 +353,14 @@ body {
 .field-label {
   font-family: var(--font-family-headline);
   font-weight: 500;
-  color: var(--brand-color-neutral-med);
+  color: #6B5B7B;
   flex-shrink: 0;
   min-width: 150px;
 }
 
 .field-value {
   font-family: var(--font-family-body);
-  color: var(--brand-color-text-dark);
+  color: #270646;
   flex: 1;
   text-align: right;
   word-break: break-word;
@@ -688,11 +688,11 @@ body {
 }
 
 [data-theme="dark"] .meta-item {
-  color: var(--brand-color-text-muted);
+  color: #A89BB8;
 }
 
 [data-theme="dark"] .meta-item strong {
-  color: var(--brand-color-secondary);
+  color: #B88FE0;
 }
 
 [data-theme="dark"] .progress-section {
@@ -735,11 +735,11 @@ body {
 }
 
 [data-theme="dark"] .field-label {
-  color: var(--brand-color-text-muted);
+  color: #A89BB8;
 }
 
 [data-theme="dark"] .field-value {
-  color: var(--brand-color-text-dark);
+  color: #E8E4F0;
 }
 
 [data-theme="dark"] .error-message {
