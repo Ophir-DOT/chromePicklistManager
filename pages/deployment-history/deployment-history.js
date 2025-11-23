@@ -2,6 +2,7 @@
 // Display and manage deployment history with filtering and export capabilities
 
 import ThemeManager from '../../background/theme-manager.js';
+import { escapeHtml } from '../../shared/utils.js';
 
 // Global state
 let deploymentHistory = [];
@@ -513,14 +514,7 @@ function getMetadataIcon(metadataType) {
   return icons[metadataType] || 'deployed_code';
 }
 
-function escapeHtml(unsafe) {
-  return String(unsafe)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+
 
 function showError(message) {
   alert(message);

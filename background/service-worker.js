@@ -47,7 +47,9 @@ async function handleMessage(request, sender, sendResponse) {
             // Only extract if it's a Salesforce URL
             if (tab && tab.url &&
                 !tab.url.startsWith('chrome-extension://') &&
-                (tab.url.includes('salesforce.com') || tab.url.includes('force.com'))) {
+                (tab.url.includes('salesforce.com') ||
+                 tab.url.includes('salesforce-setup.com') ||
+                 tab.url.includes('force.com'))) {
               session = await SessionManager.extractSession(tab);
             } else {
               // Not a Salesforce tab, use stored session

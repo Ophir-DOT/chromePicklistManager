@@ -114,23 +114,108 @@ class SessionManager {
   }
 
   static async getCurrentSession() {
-    const result = await chrome.storage.session.get('currentSession');
+    // CRITICAL: Always validate against active tab to ensure org isolation
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    if (!result.currentSession) {
-      throw new Error('No active session. Please navigate to Salesforce.');
+      if (!tab || !tab.url) {
+        return {
+          error: 'NOT_SALESFORCE_TAB',
+          message: 'No active tab found. Please open this extension from a Salesforce tab.'
+        };
+      }
+
+      // Check if current tab is Salesforce
+      if (!this.isSalesforceUrl(tab.url)) {
+        return {
+          error: 'NOT_SALESFORCE_TAB',
+          message: 'Please open this extension from a Salesforce tab.'
+        };
+      }
+
+      // Extract org domain from current tab
+      const currentOrgDomain = this.extractOrgDomain(tab.url);
+
+      if (!currentOrgDomain) {
+        return {
+          error: 'INVALID_URL',
+          message: 'Unable to determine Salesforce org from current tab.'
+        };
+      }
+
+      // Get stored session
+      const result = await chrome.storage.session.get('currentSession');
+
+      if (!result.currentSession) {
+        // No stored session - extract fresh one from current tab
+        console.log('[SessionManager] No stored session, extracting from current tab');
+        return await this.extractSession(tab);
+      }
+
+      // Validate stored session matches current tab's org
+      const storedOrgDomain = this.extractOrgDomain(result.currentSession.instanceUrl);
+
+      if (storedOrgDomain !== currentOrgDomain) {
+        console.warn('[SessionManager] ORG MISMATCH DETECTED!');
+        console.warn('[SessionManager] Current tab org:', currentOrgDomain);
+        console.warn('[SessionManager] Stored session org:', storedOrgDomain);
+        console.warn('[SessionManager] Extracting fresh session from current tab');
+
+        // Org mismatch - extract fresh session from current tab
+        return await this.extractSession(tab);
+      }
+
+      // Check if session is too old (2 hours)
+      const sessionAge = Date.now() - result.currentSession.timestamp;
+      const twoHours = 2 * 60 * 60 * 1000;
+
+      if (sessionAge > twoHours) {
+        console.warn('[SessionManager] Session older than 2 hours, may be expired - refreshing');
+        return await this.extractSession(tab);
+      }
+
+      console.log('[SessionManager] Using stored session from', new Date(result.currentSession.timestamp).toLocaleTimeString());
+      console.log('[SessionManager] Session org:', storedOrgDomain);
+      return result.currentSession;
+    } catch (error) {
+      console.error('[SessionManager] Error in getCurrentSession:', error);
+      throw new Error('Failed to get session: ' + error.message);
     }
+  }
 
-    // Check if session is too old (optional - 2 hours)
-    const sessionAge = Date.now() - result.currentSession.timestamp;
-    const twoHours = 2 * 60 * 60 * 1000;
+  /**
+   * Check if URL is a Salesforce domain
+   */
+  static isSalesforceUrl(url) {
+    return url && (
+      url.includes('.salesforce.com') ||
+      url.includes('.salesforce-setup.com') ||
+      url.includes('.force.com') ||
+      url.includes('.visual.force.com') ||
+      url.includes('.cloudforce.com') ||
+      url.includes('.salesforce.mil')
+    );
+  }
 
-    if (sessionAge > twoHours) {
-      console.warn('[SessionManager] Session older than 2 hours, may be expired');
-      // Don't throw error, just warn - let API calls fail naturally if needed
+  /**
+   * Extract org domain from Salesforce URL
+   * Returns normalized domain for comparison (e.g., "myorg.my.salesforce.com")
+   */
+  static extractOrgDomain(url) {
+    if (!url) return null;
+
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+
+      // Normalize: Convert lightning URLs to my.salesforce format
+      const normalized = this.getMyDomain(hostname);
+
+      return normalized;
+    } catch (error) {
+      console.error('[SessionManager] Error extracting org domain from URL:', url, error);
+      return null;
     }
-
-    console.log('[SessionManager] Using stored session from', new Date(result.currentSession.timestamp).toLocaleTimeString());
-    return result.currentSession;
   }
 
   static async validateSession(session) {

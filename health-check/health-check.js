@@ -2,6 +2,7 @@
 // Executes health checks sequentially with real-time UI updates
 
 import ThemeManager from '../background/theme-manager.js';
+import { escapeHtml } from '../shared/utils.js';
 
 class ProgressiveHealthCheck {
   constructor() {
@@ -112,7 +113,7 @@ class ProgressiveHealthCheck {
         <div class="tile-icon loading">
           <div class="spinner"></div>
         </div>
-        <div class="tile-title">${this.escapeHtml(check.name)}</div>
+        <div class="tile-title">${escapeHtml(check.name)}</div>
       </div>
       <div class="tile-content loading">
         <div class="skeleton long"></div>
@@ -224,7 +225,7 @@ class ProgressiveHealthCheck {
 
   renderCheckContent(result) {
     if (result.status === 'error') {
-      return `<div class="error-message">${this.escapeHtml(result.message)}</div>`;
+      return `<div class="error-message">${escapeHtml(result.message)}</div>`;
     }
 
     // Handle special cases (Org Limits, API Usage with storage/usage displays)
@@ -247,12 +248,12 @@ class ProgressiveHealthCheck {
         // Clickable value with copy functionality
         html += `
           <div class="field">
-            <div class="field-label">${this.escapeHtml(field.label)}</div>
+            <div class="field-label">${escapeHtml(field.label)}</div>
             <div class="field-value ${valueClass} copyable"
-                 data-copy-value="${this.escapeHtml(String(field.expected))}"
+                 data-copy-value="${escapeHtml(String(field.expected))}"
                  data-field-id="${fieldId}"
-                 title="Click to copy correct value: ${this.escapeHtml(String(field.expected))}">
-              ${this.escapeHtml(String(field.value))}
+                 title="Click to copy correct value: ${escapeHtml(String(field.expected))}">
+              ${escapeHtml(String(field.value))}
               <span class="copy-icon material-symbols-rounded">content_copy</span>
               <span class="copy-feedback" id="feedback-${fieldId}">Copied!</span>
             </div>
@@ -261,15 +262,15 @@ class ProgressiveHealthCheck {
       } else {
         html += `
           <div class="field">
-            <div class="field-label">${this.escapeHtml(field.label)}</div>
-            <div class="field-value ${valueClass}">${this.escapeHtml(String(field.value))}</div>
+            <div class="field-label">${escapeHtml(field.label)}</div>
+            <div class="field-value ${valueClass}">${escapeHtml(String(field.value))}</div>
           </div>
         `;
       }
 
       // Add help text if present
       if (field.helpText) {
-        html += `<div class="help-text"><strong>Action Required:</strong> ${this.escapeHtml(field.helpText)}</div>`;
+        html += `<div class="help-text"><strong>Action Required:</strong> ${escapeHtml(field.helpText)}</div>`;
       }
     });
 
@@ -360,12 +361,6 @@ class ProgressiveHealthCheck {
         }
       }
     });
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }
 

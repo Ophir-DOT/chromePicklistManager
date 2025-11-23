@@ -1,4 +1,5 @@
 // Import API client - runs in popup extension context, can make fetch calls with headers
+import { escapeHtml } from '../shared/utils.js';
 import SalesforceAPI from '../background/api-client.js';
 import MetadataAPI from '../background/metadata-api.js';
 import ToolingAPI from '../background/tooling-api.js';
@@ -53,6 +54,7 @@ function displayVersion() {
 async function checkConnection() {
   const statusIndicator = document.querySelector('.status-indicator');
   const statusText = document.querySelector('.status-text');
+  let isConnected = false;
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -60,6 +62,7 @@ async function checkConnection() {
     if (!tab || !tab.url) {
       statusIndicator.className = 'status-indicator disconnected';
       statusText.textContent = 'No active tab';
+      disableAllFeatures('No active tab detected');
       return;
     }
 
@@ -71,6 +74,8 @@ async function checkConnection() {
     if (!isSalesforce) {
       statusIndicator.className = 'status-indicator disconnected';
       statusText.textContent = 'Not on Salesforce';
+      document.getElementById('orgUrl').textContent = 'N/A';
+      disableAllFeatures('Please open this extension from a Salesforce tab');
       return;
     }
 
@@ -81,19 +86,72 @@ async function checkConnection() {
       url: tab.url
     });
 
-    if (response.success) {
+    if (response.success && response.data && !response.data.error) {
       statusIndicator.className = 'status-indicator connected';
       statusText.textContent = 'Connected';
       document.getElementById('orgUrl').textContent = response.data.instanceUrl;
+      isConnected = true;
+      enableAllFeatures();
     } else {
+      const errorMsg = response.data?.message || response.error || 'Not connected';
       statusIndicator.className = 'status-indicator disconnected';
-      statusText.textContent = response.error || 'Not connected';
+      statusText.textContent = errorMsg;
+      document.getElementById('orgUrl').textContent = 'N/A';
+      disableAllFeatures(errorMsg);
     }
   } catch (error) {
     statusIndicator.className = 'status-indicator disconnected';
     statusText.textContent = 'Error: ' + error.message;
+    document.getElementById('orgUrl').textContent = 'N/A';
     console.error('Connection check failed:', error);
+    disableAllFeatures('Connection error: ' + error.message);
   }
+}
+
+/**
+ * Disable all feature buttons and show warning message
+ */
+function disableAllFeatures(reason) {
+  const featureButtons = [
+    'exportBtn', 'exportDepsBtn', 'picklistLoaderBtn', 'dependencyLoaderBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
+    'deploymentHistoryBtn', 'exportFieldsBtn'
+  ];
+
+  featureButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+      btn.title = reason || 'Not connected to Salesforce';
+    }
+  });
+
+  console.log('[Popup] All features disabled:', reason);
+}
+
+/**
+ * Enable all feature buttons
+ */
+function enableAllFeatures() {
+  const featureButtons = [
+    'exportBtn', 'exportDepsBtn', 'picklistLoaderBtn', 'dependencyLoaderBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
+    'deploymentHistoryBtn', 'exportFieldsBtn'
+  ];
+
+  featureButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+      btn.title = '';
+    }
+  });
+
+  console.log('[Popup] All features enabled');
 }
 
 function setupEventListeners() {
@@ -203,7 +261,7 @@ async function loadObjects() {
     renderObjects(filteredObjects);
   } catch (error) {
     console.error('[Popup] Error loading objects:', error);
-    listEl.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    listEl.innerHTML = `<div class="error-message">Error: ${escapeHtml(error.message)}</div>`;
   } finally {
     loadingEl.style.display = 'none';
   }
@@ -567,7 +625,7 @@ async function loadDepsObjects() {
     renderDepsObjects(filteredDepsObjects);
   } catch (error) {
     console.error('[Popup] Error loading objects:', error);
-    listEl.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    listEl.innerHTML = `<div class="error-message">Error: ${escapeHtml(error.message)}</div>`;
   } finally {
     loadingEl.style.display = 'none';
   }
@@ -1000,19 +1058,19 @@ async function previewDepsImport() {
     html += `<p style="margin-bottom: 12px;">Mode: ${modeLabel}</p>`;
 
     for (const [objectName, data] of Object.entries(parsedDepsData.objectData)) {
-      html += `<div class="preview-object"><strong>${objectName}</strong><ul>`;
+      html += `<div class="preview-object"><strong>${escapeHtml(objectName)}</strong><ul>`;
 
       if (data.fieldDependencies.length > 0) {
         html += `<li><strong>Field Dependencies:</strong> ${data.fieldDependencies.length} field(s)</li>`;
         for (const dep of data.fieldDependencies) {
-          html += `<ul><li>${dep.dependentField} → ${dep.controllingField} (${dep.mappings.length} mappings)</li></ul>`;
+          html += `<ul><li>${escapeHtml(dep.dependentField)} → ${escapeHtml(dep.controllingField)} (${dep.mappings.length} mappings)</li></ul>`;
         }
       }
 
       if (data.recordTypePicklists.length > 0) {
         html += `<li><strong>Record Type Picklists:</strong> ${data.recordTypePicklists.length} record type(s)</li>`;
         for (const rt of data.recordTypePicklists) {
-          html += `<ul><li>${rt.recordType} (${rt.picklistValues.length} picklist(s))</li></ul>`;
+          html += `<ul><li>${escapeHtml(rt.recordType)} (${rt.picklistValues.length} picklist(s))</li></ul>`;
         }
       }
 
@@ -1036,7 +1094,7 @@ async function previewDepsImport() {
 
   } catch (error) {
     console.error('[Popup] Error generating preview:', error);
-    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.textContent = `Error: ${escapeHtml(error.message)}`;
     statusEl.className = 'status-message error';
   }
 }
@@ -1531,11 +1589,7 @@ function renderPreview(container, data) {
   container.innerHTML = html;
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+
 
 async function deployPicklistChanges() {
   const statusEl = document.getElementById('updatePicklistStatus');
@@ -2004,14 +2058,14 @@ async function handleCheckShareFiles() {
         contentEl.innerHTML = `
           <div class="status-message warning">
             <strong>Warning:</strong><br>
-            ${result.message || 'No files found to check'}
+            ${escapeHtml(result.message) || 'No files found to check'}
           </div>
         `;
       } else {
         contentEl.innerHTML = `
           <div class="status-message error">
             <strong>Check Failed:</strong><br>
-            ${result.message || 'Unknown error occurred'}
+            ${escapeHtml(result.message) || 'Unknown error occurred'}
           </div>
         `;
       }
@@ -2024,7 +2078,7 @@ async function handleCheckShareFiles() {
     const contentEl = document.getElementById('shareFilesContent');
     contentEl.innerHTML = `
       <div class="status-message error">
-        Error: ${error.message}
+        Error: ${escapeHtml(error.message)}
       </div>
     `;
   }

@@ -17,8 +17,14 @@ class SalesforceAPI {
     // Get current session
     const session = await SessionManager.getCurrentSession();
 
-    if (!session || !session.sessionId) {
-      throw new Error('No active Salesforce session. Please refresh the page.');
+    // Check for error response from SessionManager
+    if (!session || session.error) {
+      const errorMessage = session?.message || 'No active Salesforce session. Please open this extension from a Salesforce tab.';
+      throw new Error(errorMessage);
+    }
+
+    if (!session.sessionId) {
+      throw new Error('Invalid session: missing session ID.');
     }
 
     // Build full URL
