@@ -32,10 +32,38 @@ async function handleMessage(request, sender, sendResponse) {
   try {
     switch (request.action) {
       case 'GET_SESSION':
+        console.log('[ServiceWorker] GET_SESSION request:', {
+          hasTabId: !!request.tabId,
+          hasUrl: !!request.url,
+          sender: sender.tab ? `tab:${sender.tab.id}` : 'extension-page',
+          senderUrl: sender.url?.substring(0, 50)
+        });
+
         let session;
 
-        // If tabId or url provided, try to extract session from that tab
-        if (request.tabId || request.url) {
+        // Check if sender is from extension page BUT NOT popup
+        // Popup sends tabId/url to extract session from Salesforce tab
+        // Full-page tools (health check, org compare) don't send tabId/url and should use stored session
+        const isFromExtensionPage = sender.url && sender.url.startsWith('chrome-extension://');
+        const hasTabContext = !!(request.tabId || request.url);
+
+        if (isFromExtensionPage && !hasTabContext) {
+          // Full-page extension tools (no tab context) should use stored session directly
+          console.log('[ServiceWorker] Request from full-page extension tool, using stored session');
+          const result = await chrome.storage.session.get('currentSession');
+
+          if (!result.currentSession) {
+            console.warn('[ServiceWorker] No stored session found for extension page');
+            session = {
+              error: 'NO_STORED_SESSION',
+              message: 'No active Salesforce session found. Please open the extension popup from a Salesforce tab first.'
+            };
+          } else {
+            console.log('[ServiceWorker] Using stored session for extension page');
+            session = result.currentSession;
+          }
+        } else if (request.tabId || request.url) {
+          // If tabId or url provided, try to extract session from that tab
           try {
             let tab;
             if (request.tabId) {
@@ -50,9 +78,11 @@ async function handleMessage(request, sender, sendResponse) {
                 (tab.url.includes('salesforce.com') ||
                  tab.url.includes('salesforce-setup.com') ||
                  tab.url.includes('force.com'))) {
+              console.log('[ServiceWorker] Extracting session from Salesforce tab');
               session = await SessionManager.extractSession(tab);
             } else {
               // Not a Salesforce tab, use stored session
+              console.log('[ServiceWorker] Using stored session (not Salesforce tab)');
               session = await SessionManager.getCurrentSession();
             }
           } catch (error) {
@@ -60,9 +90,17 @@ async function handleMessage(request, sender, sendResponse) {
             session = await SessionManager.getCurrentSession();
           }
         } else {
-          // No tab info provided, use stored session
+          // No tab info provided, use stored session via getCurrentSession()
+          console.log('[ServiceWorker] No tab info provided, using getCurrentSession()');
           session = await SessionManager.getCurrentSession();
         }
+
+        console.log('[ServiceWorker] GET_SESSION response:', {
+          hasSession: !!session,
+          hasError: !!session?.error,
+          errorType: session?.error,
+          hasInstanceUrl: !!session?.instanceUrl
+        });
 
         sendResponse({ success: true, data: session });
         break;

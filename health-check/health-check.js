@@ -41,9 +41,19 @@ class ProgressiveHealthCheck {
     try {
       // Get session info for org URL
       const response = await chrome.runtime.sendMessage({ action: 'GET_SESSION' });
-      if (response.success && response.data) {
+
+      if (response.success && response.data && !response.data.error) {
         this.orgUrl = response.data.instanceUrl;
         document.getElementById('orgUrl').textContent = this.orgUrl;
+      } else {
+        // No active session - show error message
+        const errorMsg = response.data?.message || 'No active Salesforce session found';
+        console.error('[HealthCheck] Session error:', errorMsg);
+        document.getElementById('orgUrl').textContent = 'Not Connected';
+
+        // Show error message to user
+        this.showSessionError(errorMsg);
+        throw new Error(errorMsg);
       }
 
       // Set timestamp
@@ -52,7 +62,29 @@ class ProgressiveHealthCheck {
       document.title = `DOT Health Check - ${now.toLocaleString()}`;
     } catch (error) {
       console.error('[HealthCheck] Error loading meta info:', error);
+      throw error; // Re-throw to stop health check execution
     }
+  }
+
+  showSessionError(message) {
+    // Display user-friendly error message in the checks container
+    const container = document.getElementById('checksContainer');
+    container.innerHTML = `
+      <div class="session-error">
+        <div class="error-icon">⚠️</div>
+        <h2>No Active Salesforce Session</h2>
+        <p>${escapeHtml(message)}</p>
+        <p class="error-hint">
+          To use this tool:
+          <ol>
+            <li>Open a Salesforce tab in your browser</li>
+            <li>Log in to your Salesforce org</li>
+            <li>Click the extension icon from that Salesforce tab</li>
+            <li>Then open Health Check Report</li>
+          </ol>
+        </p>
+      </div>
+    `;
   }
 
   async loadCheckList() {

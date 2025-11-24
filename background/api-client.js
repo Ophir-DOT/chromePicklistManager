@@ -169,6 +169,13 @@ class SalesforceAPI {
    */
   async soapCall(soapEnvelope) {
     const session = await SessionManager.getCurrentSession();
+
+    // Check for error response from SessionManager
+    if (!session || session.error) {
+      const errorMessage = session?.message || 'No active Salesforce session. Please open this extension from a Salesforce tab.';
+      throw new Error(errorMessage);
+    }
+
     const endpoint = '/services/Soap/m/59.0';
     const fullUrl = new URL(endpoint, session.instanceUrl);
 

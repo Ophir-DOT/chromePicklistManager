@@ -439,6 +439,53 @@ body {
   margin-top: var(--spacing-sm);
 }
 
+/* Session error display */
+.session-error {
+  font-family: var(--font-family-body);
+  text-align: center;
+  padding: var(--spacing-xl);
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border-radius: var(--border-radius-md);
+  border: 2px solid var(--color-error);
+}
+
+.session-error .error-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.session-error h2 {
+  color: var(--color-error);
+  margin-bottom: var(--spacing-md);
+  font-size: 1.5rem;
+}
+
+.session-error p {
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+  line-height: 1.6;
+}
+
+.session-error .error-hint {
+  text-align: left;
+  background: var(--color-background);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.session-error ol {
+  margin: var(--spacing-sm) 0 0 var(--spacing-md);
+  padding-left: var(--spacing-md);
+}
+
+.session-error ol li {
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.6;
+}
+
 /* ============================================
    HELP TEXT
    ============================================ */
