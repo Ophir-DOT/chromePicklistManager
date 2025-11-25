@@ -1,9 +1,11 @@
 import SessionManager from './session-manager.js';
 import MetadataAPI from './metadata-api.js';
+import ToolingAPI from './tooling-api.js';
 import StorageManager from './storage-manager.js';
 import SalesforceAPI from './api-client.js';
 import UpdateChecker from './update-checker.js';
 import HealthCheckAPI from './health-check-api.js';
+import DeploymentHistoryAPI from './deployment-history-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -31,10 +33,38 @@ async function handleMessage(request, sender, sendResponse) {
   try {
     switch (request.action) {
       case 'GET_SESSION':
+        console.log('[ServiceWorker] GET_SESSION request:', {
+          hasTabId: !!request.tabId,
+          hasUrl: !!request.url,
+          sender: sender.tab ? `tab:${sender.tab.id}` : 'extension-page',
+          senderUrl: sender.url?.substring(0, 50)
+        });
+
         let session;
 
-        // If tabId or url provided, try to extract session from that tab
-        if (request.tabId || request.url) {
+        // Check if sender is from extension page BUT NOT popup
+        // Popup sends tabId/url to extract session from Salesforce tab
+        // Full-page tools (health check, org compare) don't send tabId/url and should use stored session
+        const isFromExtensionPage = sender.url && sender.url.startsWith('chrome-extension://');
+        const hasTabContext = !!(request.tabId || request.url);
+
+        if (isFromExtensionPage && !hasTabContext) {
+          // Full-page extension tools (no tab context) should use stored session directly
+          console.log('[ServiceWorker] Request from full-page extension tool, using stored session');
+          const result = await chrome.storage.session.get('currentSession');
+
+          if (!result.currentSession) {
+            console.warn('[ServiceWorker] No stored session found for extension page');
+            session = {
+              error: 'NO_STORED_SESSION',
+              message: 'No active Salesforce session found. Please open the extension popup from a Salesforce tab first.'
+            };
+          } else {
+            console.log('[ServiceWorker] Using stored session for extension page');
+            session = result.currentSession;
+          }
+        } else if (request.tabId || request.url) {
+          // If tabId or url provided, try to extract session from that tab
           try {
             let tab;
             if (request.tabId) {
@@ -46,10 +76,14 @@ async function handleMessage(request, sender, sendResponse) {
             // Only extract if it's a Salesforce URL
             if (tab && tab.url &&
                 !tab.url.startsWith('chrome-extension://') &&
-                (tab.url.includes('salesforce.com') || tab.url.includes('force.com'))) {
+                (tab.url.includes('salesforce.com') ||
+                 tab.url.includes('salesforce-setup.com') ||
+                 tab.url.includes('force.com'))) {
+              console.log('[ServiceWorker] Extracting session from Salesforce tab');
               session = await SessionManager.extractSession(tab);
             } else {
               // Not a Salesforce tab, use stored session
+              console.log('[ServiceWorker] Using stored session (not Salesforce tab)');
               session = await SessionManager.getCurrentSession();
             }
           } catch (error) {
@@ -57,9 +91,17 @@ async function handleMessage(request, sender, sendResponse) {
             session = await SessionManager.getCurrentSession();
           }
         } else {
-          // No tab info provided, use stored session
+          // No tab info provided, use stored session via getCurrentSession()
+          console.log('[ServiceWorker] No tab info provided, using getCurrentSession()');
           session = await SessionManager.getCurrentSession();
         }
+
+        console.log('[ServiceWorker] GET_SESSION response:', {
+          hasSession: !!session,
+          hasError: !!session?.error,
+          errorType: session?.error,
+          hasInstanceUrl: !!session?.instanceUrl
+        });
 
         sendResponse({ success: true, data: session });
         break;
@@ -82,6 +124,17 @@ async function handleMessage(request, sender, sendResponse) {
       case 'CHECK_DEPLOY_STATUS':
         const status = await checkDeployStatus(request.deployId);
         sendResponse({ success: true, data: status });
+        break;
+
+      case 'UPDATE_FIELD_DEPENDENCIES':
+        const updateResult = await updateFieldDependencies(
+          request.objectName,
+          request.dependentField,
+          request.controllingField,
+          request.mappings,
+          request.fieldMetadata
+        );
+        sendResponse({ success: true, data: updateResult });
         break;
 
       case 'COMPARE_ORGS':
@@ -119,6 +172,44 @@ async function handleMessage(request, sender, sendResponse) {
           request.recordId
         );
         sendResponse({ success: true, data: addLinksResult });
+        break;
+
+      // Deployment History
+      case 'LOG_DEPLOYMENT':
+        await DeploymentHistoryAPI.logDeployment(request.payload);
+        sendResponse({ success: true });
+        break;
+
+      case 'GET_DEPLOYMENT_HISTORY':
+        const history = await DeploymentHistoryAPI.getDeploymentHistory(request.payload);
+        sendResponse({ success: true, data: history });
+        break;
+
+      case 'GET_DEPLOYMENT_DETAILS':
+        const details = await DeploymentHistoryAPI.getDeploymentDetails(request.payload.deploymentId);
+        sendResponse({ success: true, data: details });
+        break;
+
+      case 'DELETE_DEPLOYMENT':
+        await DeploymentHistoryAPI.deleteDeployment(request.payload.deploymentId);
+        sendResponse({ success: true });
+        break;
+
+      case 'CLEAR_DEPLOYMENT_HISTORY':
+        await DeploymentHistoryAPI.clearHistory();
+        sendResponse({ success: true });
+        break;
+
+      case 'EXPORT_DEPLOYMENT_HISTORY':
+        const exportData = request.payload.format === 'csv'
+          ? DeploymentHistoryAPI.exportToCSV(request.payload.history)
+          : DeploymentHistoryAPI.exportToJSON(request.payload.history);
+        sendResponse({ success: true, data: exportData });
+        break;
+
+      case 'GET_DEPLOYMENT_STATISTICS':
+        const stats = await DeploymentHistoryAPI.getStatistics(request.payload);
+        sendResponse({ success: true, data: stats });
         break;
 
       default:
@@ -166,6 +257,129 @@ async function checkDeployStatus(deployId) {
   const session = await SessionManager.getCurrentSession();
   const status = await MetadataAPI.checkDeployStatus(session, deployId);
   return status;
+}
+
+async function updateFieldDependencies(objectName, dependentField, controllingField, mappings, fieldMetadata) {
+  const session = await SessionManager.getCurrentSession();
+
+  // Step 1: Validate all values exist
+  const validation = await ToolingAPI.validateDependencyValues(
+    session,
+    objectName,
+    controllingField,
+    dependentField,
+    mappings
+  );
+
+  if (!validation.valid) {
+    const errors = [];
+    if (validation.missingControlling.length > 0) {
+      errors.push(`Missing controlling field values: ${validation.missingControlling.join(', ')}`);
+    }
+    if (validation.missingDependent.length > 0) {
+      errors.push(`Missing dependent field values: ${validation.missingDependent.join(', ')}`);
+    }
+    throw new Error(errors.join('\n'));
+  }
+
+  // Step 2: Get CustomField ID for the dependent field
+  const fieldId = await ToolingAPI.getCustomFieldId(session, objectName, dependentField);
+
+  // Step 3: Get CURRENT field metadata to preserve existing settings
+  console.log('[ServiceWorker] Fetching current field metadata...');
+  const currentMetadata = await ToolingAPI.getCustomFieldMetadata(session, fieldId);
+  console.log('[ServiceWorker] Current metadata valueSet:', currentMetadata.Metadata.valueSet);
+
+  // Ensure valueSet exists
+  if (!currentMetadata.Metadata.valueSet) {
+    throw new Error('Field metadata does not contain valueSet. This field may not be a picklist or may not have dependencies configured.');
+  }
+
+  // Step 4: Merge new valueSettings with existing ones (append-only)
+  const existingValueSettings = currentMetadata.Metadata.valueSet.valueSettings || [];
+  const newValueSettings = fieldMetadata.valueSettings;
+
+  if (!Array.isArray(newValueSettings)) {
+    throw new Error('fieldMetadata.valueSettings must be an array');
+  }
+
+  // Create a map of existing mappings (valueName -> controllingFieldValues)
+  const existingMap = new Map();
+  existingValueSettings.forEach(vs => {
+    if (vs && vs.valueName && Array.isArray(vs.controllingFieldValue)) {
+      existingMap.set(vs.valueName, vs.controllingFieldValue);
+    }
+  });
+
+  // Merge: Update existing or add new
+  newValueSettings.forEach(vs => {
+    if (!vs || !vs.valueName || !Array.isArray(vs.controllingFieldValue)) {
+      console.warn('[ServiceWorker] Skipping invalid valueSetting:', vs);
+      return;
+    }
+
+    if (existingMap.has(vs.valueName)) {
+      // Merge controlling field values
+      const existingValues = new Set(existingMap.get(vs.valueName));
+      vs.controllingFieldValue.forEach(v => existingValues.add(v));
+      existingMap.set(vs.valueName, Array.from(existingValues));
+    } else {
+      // New mapping
+      existingMap.set(vs.valueName, vs.controllingFieldValue);
+    }
+  });
+
+  // Convert back to array
+  const mergedValueSettings = Array.from(existingMap.entries()).map(([valueName, controllingFieldValue]) => ({
+    valueName,
+    controllingFieldValue
+  }));
+
+  console.log('[ServiceWorker] Merged value settings count:', mergedValueSettings.length);
+
+  // Step 5: Build complete dependency metadata matching working format exactly
+  // Only include: label, type, valueSet, visibleLines, writeRequiresMasterRead
+  // Do NOT include: required, trackFeedHistory, trackHistory, trackTrending
+  const dependencyMetadata = {
+    label: currentMetadata.Metadata.label,
+    type: 'Picklist',
+    valueSet: {
+      controllingField: currentMetadata.Metadata.valueSet.controllingField,
+      restricted: currentMetadata.Metadata.valueSet.restricted !== undefined ? currentMetadata.Metadata.valueSet.restricted : true,
+      valueSetDefinition: currentMetadata.Metadata.valueSet.valueSetDefinition || null,
+      valueSetName: currentMetadata.Metadata.valueSet.valueSetName || null,
+      valueSettings: mergedValueSettings
+    },
+    visibleLines: currentMetadata.Metadata.visibleLines || null,
+    writeRequiresMasterRead: currentMetadata.Metadata.writeRequiresMasterRead || null
+  };
+
+  const fullName = `${objectName}.${dependentField}`;
+
+  // Log the request details for debugging
+  const patchUrl = `${session.instanceUrl}/services/data/v59.0/tooling/sobjects/CustomField/${fieldId}`;
+  const patchBody = {
+    Metadata: dependencyMetadata,
+    FullName: fullName
+  };
+
+  console.log('[ServiceWorker] PATCH URL:', patchUrl);
+  console.log('[ServiceWorker] PATCH Body:', JSON.stringify(patchBody, null, 2));
+
+  // Step 6: Update via Tooling API PATCH
+  const result = await ToolingAPI.updateFieldDependencies(
+    session,
+    fieldId,
+    dependencyMetadata,
+    fullName
+  );
+
+  return {
+    success: true,
+    fieldId: fieldId,
+    instanceUrl: session.instanceUrl,
+    message: 'Dependencies updated successfully'
+  };
 }
 
 async function compareOrgs(sourceData, targetData) {

@@ -41,28 +41,10 @@
       <!-- Main Menu View -->
       <div id="mainView">
         <section class="quick-actions">
-          <div class="button-grid">
-            <button id="exportBtn" class="action-button">
-              <span class="material-symbols-rounded icon">download</span>
-              Export Picklists
-            </button>
-
-            <button id="exportDepsBtn" class="action-button">
-              <span class="material-symbols-rounded icon">account_tree</span>
-              Export Dependencies
-            </button>
-
-            <button id="picklistLoaderBtn" class="action-button">
-              <span class="material-symbols-rounded icon">upload_file</span>
-              Picklist Loader
-            </button>
-
-            <button id="dependencyLoaderBtn" class="action-button locked-feature">
-              <span class="material-symbols-rounded icon">cloud_upload</span>
-              Dependency Loader
-              <span class="material-symbols-rounded lock-icon">lock</span>
-            </button>
-          </div>
+          <button id="picklistManagementBtn" class="action-button">
+            <span class="material-symbols-rounded icon">list_alt</span>
+            Picklist Management
+          </button>
 
           <button id="healthCheckBtn" class="action-button">
             <span class="material-symbols-rounded icon">health_and_safety</span>
@@ -94,6 +76,11 @@
             Org Compare Tool
           </button>
 
+          <button id="deploymentHistoryBtn" class="action-button">
+            <span class="material-symbols-rounded icon">history</span>
+            Deployment History
+          </button>
+
           <button id="exportFieldsBtn" class="action-button">
             <span class="material-symbols-rounded icon">table_chart</span>
             Export Fields
@@ -119,164 +106,6 @@
       </div>
 
       <!-- Export View -->
-      <div id="exportView" class="hidden">
-        <div class="view-header">
-          <button id="backBtn" class="back-button">← Back</button>
-          <h2>Export Picklists</h2>
-        </div>
-
-        <div class="export-content">
-          <div class="search-box">
-            <input type="text" id="objectSearch" placeholder="Search objects...">
-          </div>
-
-          <div class="loading-message" id="loadingObjects">
-            Loading objects...
-          </div>
-
-          <div class="object-list" id="objectList">
-            <!-- Objects will be populated here -->
-          </div>
-
-          <div class="selection-info" id="selectionInfo">
-            0 objects selected
-          </div>
-
-          <div class="button-group">
-            <button id="selectAllBtn" class="secondary-button">Select All</button>
-            <button id="clearBtn" class="secondary-button">Clear</button>
-          </div>
-
-          <button id="doExportBtn" class="primary-button" disabled>
-            Export Selected Objects
-          </button>
-
-          <div id="exportStatus" class="status-message"></div>
-        </div>
-      </div>
-
-      <!-- Export Dependencies View -->
-      <div id="exportDepsView" class="hidden">
-        <div class="view-header">
-          <button id="backFromDepsBtn" class="back-button">← Back</button>
-          <h2>Export Dependencies</h2>
-        </div>
-
-        <div class="export-content">
-          <div class="search-box">
-            <input type="text" id="depsObjectSearch" placeholder="Search objects...">
-          </div>
-
-          <div class="loading-message" id="loadingDepsObjects">
-            Loading objects...
-          </div>
-
-          <div class="object-list" id="depsObjectList">
-            <!-- Objects will be populated here with radio buttons -->
-          </div>
-
-          <div class="selection-info" id="depsSelectionInfo">
-            No object selected
-          </div>
-
-          <button id="doExportDepsBtn" class="primary-button" disabled>
-            Export Dependencies for Selected Object
-          </button>
-
-          <div id="exportDepsStatus" class="status-message"></div>
-        </div>
-      </div>
-
-      <!-- Dependency Loader View -->
-      <div id="dependencyLoaderView" class="hidden">
-        <div class="view-header">
-          <button id="backFromDependencyLoaderBtn" class="back-button">← Back</button>
-          <h2>Dependency Loader</h2>
-        </div>
-
-        <div class="export-content">
-          <div class="import-section">
-            <h3>Import Dependencies</h3>
-            <p class="help-text">Upload a CSV file with the same format as the export to update field dependencies and record type picklist values.</p>
-            <input type="file" id="depsFileInput" accept=".csv" class="file-input" />
-
-            <div class="form-section">
-              <div class="help-text">
-                <strong>Note:</strong> CSV dependencies will be merged with existing dependencies (append mode only).<br>
-                Due to Salesforce API limitations, existing dependencies cannot be removed - only new ones can be added.<br>
-                Picklist values remain unchanged.
-              </div>
-            </div>
-
-            <button id="importDepsBtn" class="primary-button" disabled>
-              Preview & Deploy Dependencies
-            </button>
-            <div id="importDepsPreview" class="preview-area hidden">
-              <h3>Preview Changes</h3>
-              <div id="importDepsPreviewContent"></div>
-              <button id="deployDepsBtn" class="primary-button">
-                Download Package & Deploy
-              </button>
-            </div>
-            <div id="importDepsStatus" class="status-message"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Update Picklist View -->
-      <div id="updatePicklistView" class="hidden">
-        <div class="view-header">
-          <button id="backFromUpdateBtn" class="back-button">← Back</button>
-          <h2>Update Picklist Values</h2>
-        </div>
-
-        <div class="export-content">
-          <div class="form-section">
-            <label for="updateObjectSelect">Select Object:</label>
-            <select id="updateObjectSelect" class="form-select">
-              <option value="">-- Select Object --</option>
-            </select>
-          </div>
-
-          <div class="form-section">
-            <label for="updateFieldSelect">Select Picklist Field:</label>
-            <select id="updateFieldSelect" class="form-select" disabled>
-              <option value="">-- Select Field --</option>
-            </select>
-          </div>
-
-          <div class="form-section">
-            <label for="csvTextarea">Paste CSV Values (one per line):</label>
-            <textarea id="csvTextarea" class="csv-textarea" placeholder="PicklistValue&#10;Value1&#10;Value2&#10;Value3" rows="10"></textarea>
-          </div>
-
-          <div class="form-section">
-            <label class="checkbox-label">
-              <input type="checkbox" id="overwriteCheckbox">
-              <span>Overwrite existing values (if unchecked, will add to existing)</span>
-            </label>
-            <div class="help-text">
-              When checked: Only CSV values will be active, all others will be deactivated.<br>
-              When unchecked: CSV values will be added to existing active values.
-            </div>
-          </div>
-
-          <button id="previewChangesBtn" class="primary-button" disabled>
-            Preview Changes
-          </button>
-
-          <div id="previewArea" class="preview-area hidden">
-            <h3>Preview Changes</h3>
-            <div id="previewContent"></div>
-            <button id="deployPicklistBtn" class="primary-button">
-              Download Package & Deploy
-            </button>
-          </div>
-
-          <div id="updatePicklistStatus" class="status-message"></div>
-        </div>
-      </div>
-
       <!-- Share Files View -->
       <div id="shareFilesView" class="hidden">
         <div class="view-header">

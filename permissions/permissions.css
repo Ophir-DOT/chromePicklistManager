@@ -299,6 +299,7 @@ body {
   background: var(--brand-color-neutral-light);
   position: sticky;
   top: 0;
+  z-index: var(--z-sticky);
 }
 
 .permissions-table tr:hover {
@@ -430,6 +431,7 @@ body {
   background: var(--brand-color-neutral-light);
   position: sticky;
   top: 0;
+  z-index: var(--z-sticky);
 }
 
 .comparison-table .source-header {
@@ -791,6 +793,7 @@ body {
 [data-theme="dark"] .comparison-table th {
   background: var(--brand-color-bg-tertiary);
   color: var(--brand-color-secondary);
+  z-index: var(--z-sticky);
 }
 
 [data-theme="dark"] .permissions-table td,

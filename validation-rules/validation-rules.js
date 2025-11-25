@@ -190,7 +190,7 @@ class ValidationRulesManager {
       container.innerHTML = `
         <div class="empty-state">
           <span class="material-symbols-rounded">error</span>
-          <p>Error loading validation rules: ${error.message}</p>
+          <p>Error loading validation rules: ${this.escapeHtml(error.message)}</p>
         </div>
       `;
     }
@@ -311,12 +311,12 @@ class ValidationRulesManager {
             </div>
             <div class="rule-details">
               <h3>
-                ${formatted.name}
+                ${this.escapeHtml(formatted.name)}
                 ${formatted.isManaged ? '<span class="status-badge status-managed">Managed</span>' : ''}
               </h3>
               <div class="rule-meta">
-                ${formatted.objectLabel} (${formatted.object}) &bull;
-                Last modified: ${this.formatDate(formatted.lastModifiedDate)} by ${formatted.lastModifiedBy}
+                ${this.escapeHtml(formatted.objectLabel)} (${this.escapeHtml(formatted.object)}) &bull;
+                Last modified: ${this.formatDate(formatted.lastModifiedDate)} by ${this.escapeHtml(formatted.lastModifiedBy)}
               </div>
             </div>
           </div>
@@ -423,7 +423,7 @@ class ValidationRulesManager {
     if (this.settings.confirmBulkActions) {
       const confirmed = await this.showConfirmModal(
         `${action.charAt(0).toUpperCase() + action.slice(1)} Rule`,
-        `Are you sure you want to ${action} "${rule.ValidationName}"?`
+        `Are you sure you want to ${action} "${this.escapeHtml(rule.ValidationName)}"?`
       );
       if (!confirmed) return;
     }
@@ -449,7 +449,7 @@ class ValidationRulesManager {
       console.log('[ValidationRulesManager] Rule status updated:', ruleId, newStatus);
     } catch (error) {
       console.error('[ValidationRulesManager] Error updating rule status:', error);
-      alert(`Error updating rule: ${error.message}`);
+      alert(`Error updating rule: ${this.escapeHtml(error.message)}`);
     }
   }
 
@@ -492,7 +492,7 @@ class ValidationRulesManager {
       console.log('[ValidationRulesManager] Bulk update complete:', results);
     } catch (error) {
       console.error('[ValidationRulesManager] Error in bulk update:', error);
-      alert(`Error in bulk update: ${error.message}`);
+      alert(`Error in bulk update: ${this.escapeHtml(error.message)}`);
     }
   }
 
@@ -512,13 +512,13 @@ class ValidationRulesManager {
       const fullRule = await ValidationRuleAPI.getValidationRule(ruleId);
       const formatted = ValidationRuleAPI.formatRule(fullRule);
 
-      document.getElementById('ruleDetailTitle').textContent = formatted.name;
+      document.getElementById('ruleDetailTitle').textContent = this.escapeHtml(formatted.name);
     document.getElementById('ruleDetailContent').innerHTML = `
       <div class="rule-detail-section">
         <div class="rule-detail-fields">
           <div class="rule-detail-field">
             <div class="rule-detail-field-label">Object</div>
-            <div class="rule-detail-field-value">${formatted.objectLabel} (${formatted.object})</div>
+            <div class="rule-detail-field-value">${this.escapeHtml(formatted.objectLabel)} (${this.escapeHtml(formatted.object)})</div>
           </div>
           <div class="rule-detail-field">
             <div class="rule-detail-field-label">Status</div>
@@ -534,17 +534,17 @@ class ValidationRulesManager {
           </div>
           <div class="rule-detail-field">
             <div class="rule-detail-field-label">Modified By</div>
-            <div class="rule-detail-field-value">${formatted.lastModifiedBy}</div>
+            <div class="rule-detail-field-value">${this.escapeHtml(formatted.lastModifiedBy)}</div>
           </div>
           ${formatted.namespace ? `
             <div class="rule-detail-field">
               <div class="rule-detail-field-label">Namespace</div>
-              <div class="rule-detail-field-value">${formatted.namespace}</div>
+              <div class="rule-detail-field-value">${this.escapeHtml(formatted.namespace)}</div>
             </div>
           ` : ''}
           <div class="rule-detail-field">
             <div class="rule-detail-field-label">Error Display Field</div>
-            <div class="rule-detail-field-value">${formatted.errorField || 'Top of Page'}</div>
+            <div class="rule-detail-field-value">${this.escapeHtml(formatted.errorField) || 'Top of Page'}</div>
           </div>
         </div>
       </div>
@@ -569,7 +569,7 @@ class ValidationRulesManager {
       ${formatted.fieldsReferenced.length > 0 ? `
         <div class="rule-detail-section">
           <h4>Fields Referenced</h4>
-          <p>${formatted.fieldsReferenced.join(', ')}</p>
+          <p>${this.escapeHtml(formatted.fieldsReferenced.join(', '))}</p>
         </div>
       ` : ''}
     `;
@@ -578,7 +578,7 @@ class ValidationRulesManager {
       document.getElementById('ruleDetailContent').innerHTML = `
         <div class="empty-state">
           <span class="material-symbols-rounded">error</span>
-          <p>Error loading rule details: ${error.message}</p>
+          <p>Error loading rule details: ${this.escapeHtml(error.message)}</p>
         </div>
       `;
     }
@@ -626,7 +626,7 @@ class ValidationRulesManager {
             ${this.analysis.warnings.map(w => `
               <li>
                 <span class="material-symbols-rounded">warning</span>
-                ${w}
+                ${this.escapeHtml(w)}
               </li>
             `).join('')}
           </ul>
@@ -653,7 +653,7 @@ class ValidationRulesManager {
               .slice(0, 20)
               .map(([obj, data]) => `
                 <tr>
-                  <td>${obj}</td>
+                  <td>${this.escapeHtml(obj)}</td>
                   <td>${data.total}</td>
                   <td>${data.active}</td>
                   <td>${Math.round((data.active / data.total) * 100)}%</td>
@@ -835,14 +835,15 @@ class ValidationRulesManager {
       </p>
       ${results.slice(0, 50).map(result => `
         <div class="test-result-item">
-          <strong>Record ${result.recordIndex}:</strong> ${result.ruleName}
+          <strong>Record ${this.escapeHtml(result.recordIndex)}:</strong> ${this.escapeHtml(result.ruleName)}
           <br>
-          <small>Fields used: ${result.fieldsUsed?.join(', ') || 'None detected'}</small>
+          <small>Fields used: ${this.escapeHtml(result.fieldsUsed?.join(', ')) || 'None detected'}</small>
         </div>
       `).join('')}
       ${results.length > 50 ? `<p>...and ${results.length - 50} more results</p>` : ''}
     `;
   }
+
 
   showConfirmModal(title, message) {
     return new Promise((resolve) => {

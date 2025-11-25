@@ -17,104 +17,165 @@ class SalesforceAPI {
     // Get current session
     const session = await SessionManager.getCurrentSession();
 
-    if (!session || !session.sessionId) {
-      throw new Error('No active Salesforce session. Please refresh the page.');
+    // Check for error response from SessionManager
+    if (!session || session.error) {
+      const errorMessage = session?.message || 'No active Salesforce session. Please open this extension from a Salesforce tab.';
+      throw new Error(errorMessage);
+    }
+
+    if (!session.sessionId) {
+      throw new Error('Invalid session: missing session ID.');
     }
 
     // Build full URL
     const fullUrl = new URL(endpoint, session.instanceUrl);
 
-    // Build headers - THIS IS THE CRITICAL FIX
-    // Service workers (Manifest V3) use fetch() but FROM EXTENSION CONTEXT
-    // which allows us to set Authorization headers
-    const fetchHeaders = {
-      'Authorization': 'Bearer ' + session.sessionId,
-      'Accept': 'application/json; charset=UTF-8',
-      'Content-Type': 'application/json; charset=UTF-8',
-      'Sforce-Call-Options': 'client=Salesforce Picklist Manager',
-      ...headers
-    };
+    // Detect if running in service worker context (Manifest V3)
+    // Service workers don't have XMLHttpRequest, must use fetch
+    const isServiceWorker = typeof XMLHttpRequest === 'undefined';
 
-    // Build fetch options
-    const fetchOptions = {
-      method,
-      headers: fetchHeaders
-    };
+    if (isServiceWorker) {
+      // Use fetch API in service worker context
+      const fetchHeaders = {
+        'Authorization': 'Bearer ' + session.sessionId,
+        'Accept': 'application/json; charset=UTF-8',
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Sforce-Call-Options': 'client=Salesforce Picklist Manager',
+        ...headers
+      };
 
-    // Add body for non-GET requests
-    if (body && method !== 'GET') {
-      fetchOptions.body = JSON.stringify(body);
-    }
+      const fetchOptions = {
+        method: method,
+        headers: fetchHeaders
+      };
 
-    // CRITICAL: Must use XMLHttpRequest, not fetch()!
-    // Extension pages (popup, sidepanel) can use XMLHttpRequest for cross-origin requests
-    // but fetch() is still subject to CORS restrictions even in extension context
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open(method, fullUrl.toString(), true);
-
-      // Set headers
-      xhr.setRequestHeader('Authorization', 'Bearer ' + session.sessionId);
-      xhr.setRequestHeader('Accept', 'application/json; charset=UTF-8');
-      xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-      xhr.setRequestHeader('Sforce-Call-Options', 'client=Salesforce Picklist Manager');
-
-      // Add any additional headers
-      for (const [name, value] of Object.entries(headers)) {
-        xhr.setRequestHeader(name, value);
+      if (body && method !== 'GET') {
+        fetchOptions.body = JSON.stringify(body);
       }
 
-      // Set response type
-      xhr.responseType = 'json';
-
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else if (xhr.status === 401) {
-            const error = new Error('Session expired or invalid. Please refresh the Salesforce page and try again.');
-            error.code = 'SESSION_EXPIRED';
-            reject(error);
-          } else if (xhr.status === 403) {
-            const error = new Error('Access denied. Check your Salesforce permissions.');
-            error.code = 'ACCESS_DENIED';
-            reject(error);
-          } else if (xhr.status === 0) {
-            reject(new Error('Network error or CORS issue. Make sure you are logged into Salesforce.'));
-          } else {
-            const errorMessage = xhr.response
-              ? JSON.stringify(xhr.response)
-              : xhr.statusText;
-            reject(new Error(`API Error ${xhr.status}: ${errorMessage}`));
-          }
-        }
-      };
-
-      xhr.onerror = () => {
-        console.error('[SalesforceAPI] XHR error event');
-        reject(new Error('Network error. Check your internet connection.'));
-      };
-
-      xhr.ontimeout = () => {
-        console.error('[SalesforceAPI] XHR timeout');
-        reject(new Error('Request timeout.'));
-      };
-
-      // Set timeout (30 seconds)
-      xhr.timeout = 30000;
-
-      // Send request
       try {
-        if (body && method !== 'GET') {
-          xhr.send(JSON.stringify(body));
+        const response = await fetch(fullUrl.toString(), fetchOptions);
+
+        if (response.status >= 200 && response.status < 300) {
+          // PATCH operations often return 204 No Content (empty response)
+          // Check if there's actually content before trying to parse JSON
+          const contentType = response.headers.get('content-type');
+          const contentLength = response.headers.get('content-length');
+
+          if (response.status === 204 || contentLength === '0' || !contentType?.includes('application/json')) {
+            // Return success indicator for empty responses
+            return { success: true };
+          }
+
+          // Try to parse JSON, but handle empty responses gracefully
+          const text = await response.text();
+          if (!text || text.trim().length === 0) {
+            return { success: true };
+          }
+
+          return JSON.parse(text);
+        } else if (response.status === 401) {
+          const error = new Error('Session expired or invalid. Please refresh the Salesforce page and try again.');
+          error.code = 'SESSION_EXPIRED';
+          throw error;
+        } else if (response.status === 403) {
+          const error = new Error('Access denied. Check your Salesforce permissions.');
+          error.code = 'ACCESS_DENIED';
+          throw error;
         } else {
-          xhr.send();
+          let errorMessage = response.statusText;
+          try {
+            const errorBody = await response.json();
+            // Salesforce API errors are often arrays
+            if (errorBody && Array.isArray(errorBody)) {
+              errorMessage = errorBody.map(err => err?.message || JSON.stringify(err)).join(', ');
+            } else if (errorBody && errorBody.message) {
+              errorMessage = errorBody.message;
+            } else if (errorBody) {
+              errorMessage = JSON.stringify(errorBody);
+            }
+          } catch (e) {
+            // Ignore if response is not JSON
+            console.error('[SalesforceAPI] Error parsing error response:', e);
+          }
+          const fullError = new Error(`API Error ${response.status}: ${errorMessage}`);
+          console.error('[SalesforceAPI] Full error response:', { status: response.status, errorMessage });
+          throw fullError;
         }
       } catch (error) {
-        console.error('[SalesforceAPI] Send error:', error);
-        reject(error);
+        console.error('[SalesforceAPI] Fetch error:', error);
+        throw error;
       }
-    });
+    } else {
+      // Use XMLHttpRequest for extension pages (popup, sidepanel, etc.)
+      // Extension pages can use XMLHttpRequest for cross-origin requests
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, fullUrl.toString(), true);
+
+        // Set headers
+        xhr.setRequestHeader('Authorization', 'Bearer ' + session.sessionId);
+        xhr.setRequestHeader('Accept', 'application/json; charset=UTF-8');
+        xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        xhr.setRequestHeader('Sforce-Call-Options', 'client=Salesforce Picklist Manager');
+
+        // Add any additional headers
+        for (const [name, value] of Object.entries(headers)) {
+          xhr.setRequestHeader(name, value);
+        }
+
+        // Set response type
+        xhr.responseType = 'json';
+
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.response);
+            } else if (xhr.status === 401) {
+              const error = new Error('Session expired or invalid. Please refresh the Salesforce page and try again.');
+              error.code = 'SESSION_EXPIRED';
+              reject(error);
+            } else if (xhr.status === 403) {
+              const error = new Error('Access denied. Check your Salesforce permissions.');
+              error.code = 'ACCESS_DENIED';
+              reject(error);
+            } else if (xhr.status === 0) {
+              reject(new Error('Network error or CORS issue. Make sure you are logged into Salesforce.'));
+            } else {
+              const errorMessage = xhr.response
+                ? JSON.stringify(xhr.response)
+                : xhr.statusText;
+              reject(new Error(`API Error ${xhr.status}: ${errorMessage}`));
+            }
+          }
+        };
+
+        xhr.onerror = () => {
+          console.error('[SalesforceAPI] XHR error event');
+          reject(new Error('Network error. Check your internet connection.'));
+        };
+
+        xhr.ontimeout = () => {
+          console.error('[SalesforceAPI] XHR timeout');
+          reject(new Error('Request timeout.'));
+        };
+
+        // Set timeout (30 seconds)
+        xhr.timeout = 30000;
+
+        // Send request
+        try {
+          if (body && method !== 'GET') {
+            xhr.send(JSON.stringify(body));
+          } else {
+            xhr.send();
+          }
+        } catch (error) {
+          console.error('[SalesforceAPI] Send error:', error);
+          reject(error);
+        }
+      });
+    }
   }
 
   /**
@@ -163,6 +224,13 @@ class SalesforceAPI {
    */
   async soapCall(soapEnvelope) {
     const session = await SessionManager.getCurrentSession();
+
+    // Check for error response from SessionManager
+    if (!session || session.error) {
+      const errorMessage = session?.message || 'No active Salesforce session. Please open this extension from a Salesforce tab.';
+      throw new Error(errorMessage);
+    }
+
     const endpoint = '/services/Soap/m/59.0';
     const fullUrl = new URL(endpoint, session.instanceUrl);
 

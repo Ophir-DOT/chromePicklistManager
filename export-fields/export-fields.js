@@ -1,10 +1,8 @@
-// Export Fields UI Controller
-// Provides interface for exporting Salesforce field metadata
-
 import ThemeManager from '../background/theme-manager.js';
 import SessionManager from '../background/session-manager.js';
 import ExportFieldsAPI from '../background/export-fields-api.js';
 import FieldUsageAPI from '../background/field-usage-api.js';
+import { escapeHtml } from '../shared/utils.js';
 
 class ExportFieldsManager {
   constructor() {
@@ -160,7 +158,7 @@ class ExportFieldsManager {
       console.error('[ExportFieldsManager] Error loading objects:', error);
       loadingMessage.innerHTML = `
         <span class="material-symbols-rounded">error</span>
-        Error loading objects: ${error.message}
+        Error loading objects: ${escapeHtml(error.message)}
       `;
     }
   }
@@ -184,8 +182,8 @@ class ExportFieldsManager {
         return `
           <div class="object-item ${isSelected ? 'selected' : ''}" data-name="${obj.name}">
             <input type="checkbox" ${isSelected ? 'checked' : ''}>
-            <span class="object-item-label">${obj.label}</span>
-            <span class="object-item-name">(${obj.name})</span>
+            <span class="object-item-label">${escapeHtml(obj.label)}</span>
+            <span class="object-item-name">(${escapeHtml(obj.name)})</span>
             ${obj.custom ? '<span class="object-item-badge custom">Custom</span>' : ''}
           </div>
         `;
@@ -313,7 +311,7 @@ class ExportFieldsManager {
         (current, total, objectName) => {
           const percent = Math.round((current / total) * 100);
           document.getElementById('progressBar').style.width = `${percent}%`;
-          document.getElementById('progressText').textContent = `Loading ${objectName}...`;
+          document.getElementById('progressText').textContent = `Loading ${escapeHtml(objectName)}...`;
           document.getElementById('progressDetails').textContent = `${current} of ${total} objects`;
         }
       );
@@ -341,7 +339,7 @@ class ExportFieldsManager {
       console.error('[ExportFieldsManager] Error loading fields:', error);
       progressSection.classList.add('hidden');
       emptyState.classList.remove('hidden');
-      emptyState.querySelector('p').textContent = `Error loading fields: ${error.message}`;
+      emptyState.querySelector('p').textContent = `Error loading fields: ${escapeHtml(error.message)}`;
     }
   }
 
@@ -429,10 +427,10 @@ class ExportFieldsManager {
           <td class="col-checkbox">
             <input type="checkbox" ${isSelected ? 'checked' : ''}>
           </td>
-          <td class="col-object">${field.objectName}</td>
-          <td class="col-label">${field.label}</td>
-          <td class="col-apiname">${field.apiName}</td>
-          <td class="col-type">${field.type}</td>
+          <td class="col-object">${escapeHtml(field.objectName)}</td>
+          <td class="col-label">${escapeHtml(field.label)}</td>
+          <td class="col-apiname">${escapeHtml(field.apiName)}</td>
+          <td class="col-type">${escapeHtml(field.type)}</td>
           <td class="col-required">
             ${field.required ? '<span class="badge-yes badge-required">Yes</span>' : ''}
           </td>
@@ -618,7 +616,7 @@ class ExportFieldsManager {
       for (const objectName of objectNames) {
         const fieldNames = fieldsByObject[objectName];
 
-        progressText.textContent = `Analyzing ${objectName}... (${completed + 1}/${total})`;
+        progressText.textContent = `Analyzing ${escapeHtml(objectName)}... (${completed + 1}/${total})`;
 
         try {
           const usageMap = await FieldUsageAPI.getFieldUsageStats(objectName, fieldNames, (current, total) => {
@@ -657,7 +655,7 @@ class ExportFieldsManager {
       console.log('[ExportFieldsManager] Usage data loaded for', this.fieldUsageData.size, 'fields');
     } catch (error) {
       console.error('[ExportFieldsManager] Error loading usage data:', error);
-      alert('Failed to load usage data: ' + error.message);
+      alert('Failed to load usage data: ' + escapeHtml(error.message));
       document.getElementById('usageProgress').classList.add('hidden');
       document.getElementById('loadUsageBtn').disabled = false;
     }
@@ -670,9 +668,3 @@ class ExportFieldsManager {
     return 'No records have a value in this field';
   }
 }
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  const manager = new ExportFieldsManager();
-  manager.init();
-});

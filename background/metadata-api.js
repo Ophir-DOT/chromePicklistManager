@@ -324,7 +324,8 @@ class MetadataAPI {
         <trackTrending>false</trackTrending>
         <type>${field.type}</type>`;
 
-      if (field.values && field.values.length > 0) {
+      // Add valueSet if there are values OR if there's a controlling field (for dependencies)
+      if ((field.values && field.values.length > 0) || field.controllingField || (field.valueSettings && field.valueSettings.length > 0)) {
         xml += `
         <valueSet>`;
 
@@ -334,21 +335,24 @@ class MetadataAPI {
             <controllingField>${this.escapeXml(field.controllingField)}</controllingField>`;
         }
 
-        xml += `
+        // Only add valueSetDefinition if there are values (not for global value sets)
+        if (field.values && field.values.length > 0) {
+          xml += `
             <valueSetDefinition>
                 <sorted>false</sorted>`;
 
-        field.values.forEach(value => {
-          xml += `
+          field.values.forEach(value => {
+            xml += `
                 <value>
                     <fullName>${this.escapeXml(value.fullName)}</fullName>
                     <default>${value.default || false}</default>
                     <label>${this.escapeXml(value.label || value.fullName)}</label>
                 </value>`;
-        });
+          });
 
-        xml += `
+          xml += `
             </valueSetDefinition>`;
+        }
 
         // Add value settings for field dependencies
         if (field.valueSettings && field.valueSettings.length > 0) {

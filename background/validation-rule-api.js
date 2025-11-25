@@ -12,11 +12,11 @@ class ValidationRuleAPI {
    * @param {string} options.objectName - Filter by SObject (EntityDefinition.QualifiedApiName)
    * @param {boolean} options.activeOnly - Filter by Active status
    * @param {string} options.searchTerm - Search in name, error message, or formula
-   * @param {number} options.limit - Maximum number of records to return (default 200)
+   * @param {number} options.limit - Maximum number of records to return (default 2000)
    * @returns {Promise<Array>} Array of validation rule records
    */
   static async getValidationRules(options = {}) {
-    const { objectName, activeOnly, searchTerm, limit = 200 } = options;
+    const { objectName, activeOnly, searchTerm, limit = 2000 } = options;
 
     // Build WHERE clause
     // Note: Avoid relationship field traversal (EntityDefinition.QualifiedApiName) as it causes 500 errors

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment History - DOT Toolkit</title>
+  <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="../../popup/design-tokens.css">
+  <link rel="stylesheet" href="deployment-history.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="header-content">
+        <h1>
+          <span class="material-symbols-rounded">history</span>
+          Deployment History
+        </h1>
+        <div class="header-actions">
+          <button id="refreshBtn" class="btn btn-icon" title="Refresh">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+          <button id="exportBtn" class="btn btn-icon" title="Export">
+            <span class="material-symbols-rounded">download</span>
+          </button>
+          <button id="clearBtn" class="btn btn-icon" title="Clear History">
+            <span class="material-symbols-rounded">delete</span>
+          </button>
+        </div>
+      </div>
+      <p class="header-description">Track and audit all metadata changes made through the extension</p>
+    </header>
+
+    <!-- Statistics Cards -->
+    <div id="statsSection" class="stats-section">
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon total">inventory_2</span>
+        <div class="stat-content">
+          <span class="stat-value" id="totalCount">0</span>
+          <span class="stat-label">Total Deployments</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon success">check_circle</span>
+        <div class="stat-content">
+          <span class="stat-value" id="successCount">0</span>
+          <span class="stat-label">Successful</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon failed">error</span>
+        <div class="stat-content">
+          <span class="stat-value" id="failedCount">0</span>
+          <span class="stat-label">Failed</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-symbols-rounded stat-icon recent">schedule</span>
+        <div class="stat-content">
+          <span class="stat-value" id="recentCount">0</span>
+          <span class="stat-label">Last 7 Days</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="metadataTypeFilter">Type:</label>
+        <select id="metadataTypeFilter">
+          <option value="">All Types</option>
+          <option value="CustomObject">Custom Object</option>
+          <option value="CustomField">Custom Field</option>
+          <option value="ValidationRule">Validation Rule</option>
+          <option value="Flow">Flow</option>
+          <option value="Picklist">Picklist</option>
+          <option value="FieldDependency">Field Dependency</option>
+          <option value="Profile">Profile</option>
+          <option value="PermissionSet">Permission Set</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="actionFilter">Action:</label>
+        <select id="actionFilter">
+          <option value="">All Actions</option>
+          <option value="create">Create</option>
+          <option value="update">Update</option>
+          <option value="delete">Delete</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter">
+          <option value="">All</option>
+          <option value="success">Success</option>
+          <option value="failure">Failure</option>
+        </select>
+      </div>
+      <div class="filter-group date-group">
+        <label for="dateFromFilter">From:</label>
+        <input type="date" id="dateFromFilter">
+      </div>
+      <div class="filter-group date-group">
+        <label for="dateToFilter">To:</label>
+        <input type="date" id="dateToFilter">
+      </div>
+      <div class="filter-group search-group">
+        <input type="text" id="searchInput" placeholder="Search deployments...">
+      </div>
+    </div>
+
+    <!-- Timeline View Toggle -->
+    <div class="view-controls">
+      <button id="listViewBtn" class="view-btn active">
+        <span class="material-symbols-rounded">list</span>
+        List View
+      </button>
+      <button id="timelineViewBtn" class="view-btn">
+        <span class="material-symbols-rounded">timeline</span>
+        Timeline View
+      </button>
+    </div>
+
+    <!-- List View -->
+    <div id="listView" class="list-view">
+      <div class="table-container">
+        <table class="deployment-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Org</th>
+              <th>Type</th>
+              <th>Action</th>
+              <th>Component</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="deploymentTableBody">
+            <tr>
+              <td colspan="7" class="empty-state">
+                <span class="material-symbols-rounded">history</span>
+                <p>No deployment history found</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Timeline View -->
+    <div id="timelineView" class="timeline-view hidden">
+      <div id="timelineContainer" class="timeline-container">
+        <div class="empty-state">
+          <span class="material-symbols-rounded">timeline</span>
+          <p>No deployment history found</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Export Deployment History</h3>
+        <div class="export-options">
+          <label class="radio-label">
+            <input type="radio" name="exportFormat" value="csv" checked>
+            <span>CSV</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="exportFormat" value="json">
+            <span>JSON</span>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button id="doExportBtn" class="btn btn-primary">
+            <span class="material-symbols-rounded">download</span>
+            Export
+          </button>
+          <button id="cancelExportBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h3>Deployment Details</h3>
+          <button id="closeDetailsBtn" class="btn btn-icon">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+        <div id="detailsContent" class="modal-body">
+          <!-- Details will be populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="deployment-history.js"></script>
+</body>
+</html>

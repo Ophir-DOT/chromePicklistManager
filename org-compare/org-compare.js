@@ -9,6 +9,9 @@ let availableSessions = [];
 let sourceSession = null;
 let targetSession = null;
 let comparisonResults = null;
+let collapsedSections = new Set(); // Track collapsed sections by metadata type
+let currentView = 'comparison'; // 'comparison' or 'xml'
+let xmlData = null; // Store XML data for current comparison
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -53,6 +56,20 @@ function setupEventListeners() {
   document.getElementById('statusFilter').addEventListener('change', filterResults);
   document.getElementById('typeFilter').addEventListener('change', filterResults);
   document.getElementById('searchInput').addEventListener('input', filterResults);
+
+  // Collapse/Expand buttons
+  document.getElementById('expandAllBtn').addEventListener('click', expandAllSections);
+  document.getElementById('collapseAllBtn').addEventListener('click', collapseAllSections);
+
+  // View toggle buttons
+  document.getElementById('comparisonViewBtn').addEventListener('click', () => switchView('comparison'));
+  document.getElementById('xmlViewBtn').addEventListener('click', () => switchView('xml'));
+
+  // XML viewer buttons
+  document.getElementById('copySourceXmlBtn').addEventListener('click', () => copyXml('source'));
+  document.getElementById('copyTargetXmlBtn').addEventListener('click', () => copyXml('target'));
+  document.getElementById('downloadSourceXmlBtn').addEventListener('click', () => downloadXml('source'));
+  document.getElementById('downloadTargetXmlBtn').addEventListener('click', () => downloadXml('target'));
 }
 
 async function loadSessions() {
@@ -105,6 +122,11 @@ function populateOrgSelect(selectEl, sessions) {
     if (session.isSandbox) {
       displayText += ' [Sandbox]';
     }
+
+    // Add instance subdomain to differentiate sandboxes with same name
+    // Extract subdomain from hostname (e.g., "mycompany--dev.my.salesforce.com" -> "mycompany--dev")
+    const subdomain = session.hostname.split('.')[0];
+    displayText += ` - ${subdomain}`;
 
     option.textContent = displayText;
     selectEl.appendChild(option);
@@ -341,6 +363,7 @@ async function runComparison() {
   const resultsContainer = document.getElementById('resultsContainer');
   const summarySection = document.getElementById('summarySection');
   const filterBar = document.getElementById('filterBar');
+  const viewToggle = document.getElementById('viewToggle');
   const exportBtn = document.getElementById('exportBtn');
 
   try {
@@ -360,8 +383,6 @@ async function runComparison() {
       permissionId: document.getElementById('permissionItemSelect').value || null
     };
 
-    console.log('[OrgCompare] Running comparison:', selectedTypes, options);
-
     // Run the comparison
     comparisonResults = await OrgCompareAPI.compareOrgs(
       sourceSession,
@@ -370,7 +391,11 @@ async function runComparison() {
       options
     );
 
-    console.log('[OrgCompare] Comparison complete:', comparisonResults);
+    // Clear XML cache when running new comparison
+    xmlData = null;
+
+    // Load collapsed state from localStorage
+    loadCollapsedState();
 
     // Update summary
     updateSummary(comparisonResults.summary);
@@ -380,8 +405,14 @@ async function runComparison() {
     updateTypeFilter(selectedTypes);
     filterBar.classList.remove('hidden');
 
+    // Show view toggle
+    viewToggle.classList.remove('hidden');
+
     // Render results
     renderResults(comparisonResults);
+
+    // Switch to comparison view
+    switchView('comparison');
 
     // Enable export
     exportBtn.disabled = false;
@@ -465,8 +496,13 @@ function createComparisonSection(metadataType, comparison) {
   // Header
   const header = document.createElement('div');
   header.className = 'comparison-header';
+
+  const isCollapsed = collapsedSections.has(metadataType);
+  const collapseIcon = isCollapsed ? 'expand_more' : 'expand_less';
+
   header.innerHTML = `
     <div class="comparison-title">
+      <span class="material-symbols-rounded collapse-icon">${collapseIcon}</span>
       <span class="material-symbols-rounded">${typeIcons[metadataType] || 'category'}</span>
       ${typeLabels[metadataType] || metadataType}
     </div>
@@ -480,7 +516,7 @@ function createComparisonSection(metadataType, comparison) {
 
   // Toggle collapse on header click
   header.addEventListener('click', () => {
-    itemsContainer.classList.toggle('hidden');
+    toggleSection(metadataType, itemsContainer, header);
   });
 
   section.appendChild(header);
@@ -488,6 +524,11 @@ function createComparisonSection(metadataType, comparison) {
   // Items
   const itemsContainer = document.createElement('div');
   itemsContainer.className = 'comparison-items';
+
+  // Set initial collapsed state
+  if (isCollapsed) {
+    itemsContainer.classList.add('hidden');
+  }
 
   if (comparison.error) {
     itemsContainer.innerHTML = `
@@ -527,13 +568,18 @@ function createComparisonItem(item) {
     targetOnly: 'Target Only'
   };
 
-  // Key column
-  const keyCol = document.createElement('div');
-  keyCol.className = 'item-key';
-  keyCol.innerHTML = `
-    <span>${escapeHtml(item.key)}</span>
+  // Item header (always visible)
+  const itemHeader = document.createElement('div');
+  itemHeader.className = 'item-header';
+  itemHeader.innerHTML = `
+    <span class="material-symbols-rounded item-collapse-icon">expand_less</span>
+    <span class="item-name">${escapeHtml(item.key)}</span>
     <span class="item-status ${item.status}">${statusLabels[item.status]}</span>
   `;
+
+  // Item details container (collapsible)
+  const itemDetails = document.createElement('div');
+  itemDetails.className = 'item-details';
 
   // Source values column
   const sourceCol = document.createElement('div');
@@ -541,6 +587,9 @@ function createComparisonItem(item) {
   sourceCol.innerHTML = `<h4>Source Org</h4>`;
 
   for (const [field, value] of Object.entries(item.sourceValues)) {
+    // Skip valueMappings - it has its own dedicated section
+    if (field === 'valueMappings') continue;
+
     const isDifferent = item.differences.includes(field);
     const valueClass = value === null ? 'null' : (isDifferent ? 'different' : '');
     const displayValue = value === null ? '(not present)' : formatValue(value);
@@ -560,6 +609,9 @@ function createComparisonItem(item) {
   targetCol.innerHTML = `<h4>Target Org</h4>`;
 
   for (const [field, value] of Object.entries(item.targetValues)) {
+    // Skip valueMappings - it has its own dedicated section
+    if (field === 'valueMappings') continue;
+
     const isDifferent = item.differences.includes(field);
     const valueClass = value === null ? 'null' : (isDifferent ? 'different' : '');
     const displayValue = value === null ? '(not present)' : formatValue(value);
@@ -573,11 +625,181 @@ function createComparisonItem(item) {
     targetCol.appendChild(row);
   }
 
-  div.appendChild(keyCol);
-  div.appendChild(sourceCol);
-  div.appendChild(targetCol);
+  itemDetails.appendChild(sourceCol);
+  itemDetails.appendChild(targetCol);
+
+  // Add value mapping section for dependencies
+  // Show differences if they exist, OR show mappings for sourceOnly/targetOnly items
+  if (item.valueMappingDifferences && item.valueMappingDifferences.length > 0) {
+    const mappingSection = createValueMappingSection(item.valueMappingDifferences);
+    itemDetails.appendChild(mappingSection);
+  } else if (item.sourceValues && item.sourceValues.valueMappings !== undefined && item.sourceValues.valueMappings.length > 0) {
+    // Source only - show source mappings
+    const mappingSection = createSingleOrgMappingSection(item.sourceValues.valueMappings, 'Source Org');
+    itemDetails.appendChild(mappingSection);
+  } else if (item.targetValues && item.targetValues.valueMappings !== undefined && item.targetValues.valueMappings.length > 0) {
+    // Target only - show target mappings
+    const mappingSection = createSingleOrgMappingSection(item.targetValues.valueMappings, 'Target Org');
+    itemDetails.appendChild(mappingSection);
+  } else if ((item.sourceValues && item.sourceValues.valueMappings !== undefined) ||
+             (item.targetValues && item.targetValues.valueMappings !== undefined)) {
+    // Dependency exists but has no value mappings (e.g., controlling field not found)
+    const noMappingsSection = createNoMappingsSection();
+    itemDetails.appendChild(noMappingsSection);
+  }
+
+  // Add click handler to toggle details
+  itemHeader.addEventListener('click', () => {
+    itemDetails.classList.toggle('collapsed');
+    const icon = itemHeader.querySelector('.item-collapse-icon');
+    icon.textContent = itemDetails.classList.contains('collapsed') ? 'expand_more' : 'expand_less';
+  });
+
+  div.appendChild(itemHeader);
+  div.appendChild(itemDetails);
 
   return div;
+}
+
+function createValueMappingSection(valueMappingDifferences) {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const header = document.createElement('h4');
+  header.className = 'value-mapping-header';
+  header.innerHTML = `
+    <span class="material-symbols-rounded">compare_arrows</span>
+    Controlling → Dependent Value Mappings (${valueMappingDifferences.length} difference${valueMappingDifferences.length !== 1 ? 's' : ''})
+  `;
+  section.appendChild(header);
+
+  const mappingList = document.createElement('div');
+  mappingList.className = 'value-mapping-list';
+
+  valueMappingDifferences.forEach(diff => {
+    const mappingItem = document.createElement('div');
+    mappingItem.className = 'value-mapping-item';
+
+    // Controlling value header
+    const controllingHeader = document.createElement('div');
+    controllingHeader.className = 'controlling-value-header';
+    controllingHeader.innerHTML = `
+      <span class="material-symbols-rounded">arrow_right</span>
+      <strong>When "${escapeHtml(diff.controllingValue)}"</strong> is selected:
+    `;
+    mappingItem.appendChild(controllingHeader);
+
+    // Value differences
+    const diffContainer = document.createElement('div');
+    diffContainer.className = 'value-diff-container';
+
+    // Only in source (removed values)
+    if (diff.onlyInSource.length > 0) {
+      const sourceOnlyDiv = document.createElement('div');
+      sourceOnlyDiv.className = 'value-diff source-only';
+      sourceOnlyDiv.innerHTML = `
+        <span class="diff-label">
+          <span class="material-symbols-rounded">remove_circle</span>
+          Only in Source (${diff.onlyInSource.length}):
+        </span>
+        <span class="diff-values">${diff.onlyInSource.map(v => escapeHtml(v)).join(', ')}</span>
+      `;
+      diffContainer.appendChild(sourceOnlyDiv);
+    }
+
+    // Only in target (added values)
+    if (diff.onlyInTarget.length > 0) {
+      const targetOnlyDiv = document.createElement('div');
+      targetOnlyDiv.className = 'value-diff target-only';
+      targetOnlyDiv.innerHTML = `
+        <span class="diff-label">
+          <span class="material-symbols-rounded">add_circle</span>
+          Only in Target (${diff.onlyInTarget.length}):
+        </span>
+        <span class="diff-values">${diff.onlyInTarget.map(v => escapeHtml(v)).join(', ')}</span>
+      `;
+      diffContainer.appendChild(targetOnlyDiv);
+    }
+
+    // Count summary
+    const countSummary = document.createElement('div');
+    countSummary.className = 'value-count-summary';
+    countSummary.innerHTML = `
+      <span>Source: ${diff.sourceCount} value${diff.sourceCount !== 1 ? 's' : ''}</span>
+      <span class="count-separator">|</span>
+      <span>Target: ${diff.targetCount} value${diff.targetCount !== 1 ? 's' : ''}</span>
+    `;
+    diffContainer.appendChild(countSummary);
+
+    mappingItem.appendChild(diffContainer);
+    mappingList.appendChild(mappingItem);
+  });
+
+  section.appendChild(mappingList);
+  return section;
+}
+
+function createSingleOrgMappingSection(valueMappings, orgLabel) {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const header = document.createElement('h4');
+  header.className = 'value-mapping-header';
+  header.innerHTML = `
+    <span class="material-symbols-rounded">arrow_forward</span>
+    Controlling → Dependent Value Mappings (${orgLabel})
+  `;
+  section.appendChild(header);
+
+  const mappingList = document.createElement('div');
+  mappingList.className = 'value-mapping-list';
+
+  valueMappings.forEach(mapping => {
+    const mappingItem = document.createElement('div');
+    mappingItem.className = 'value-mapping-item';
+
+    // Controlling value header
+    const controllingHeader = document.createElement('div');
+    controllingHeader.className = 'controlling-value-header';
+    controllingHeader.innerHTML = `
+      <span class="material-symbols-rounded">arrow_right</span>
+      <strong>When "${escapeHtml(mapping.controllingValue)}"</strong> is selected:
+    `;
+    mappingItem.appendChild(controllingHeader);
+
+    // Dependent values list
+    const valuesList = document.createElement('div');
+    valuesList.className = 'value-diff-container';
+
+    const valuesDiv = document.createElement('div');
+    valuesDiv.className = 'value-diff-values-only';
+    valuesDiv.innerHTML = `
+      <span class="values-label">Enabled values (${mapping.dependentValues.length}):</span>
+      <span class="values-list">${mapping.dependentValues.map(v => escapeHtml(v.value)).join(', ')}</span>
+    `;
+    valuesList.appendChild(valuesDiv);
+
+    mappingItem.appendChild(valuesList);
+    mappingList.appendChild(mappingItem);
+  });
+
+  section.appendChild(mappingList);
+  return section;
+}
+
+function createNoMappingsSection() {
+  const section = document.createElement('div');
+  section.className = 'value-mapping-section';
+
+  const message = document.createElement('div');
+  message.className = 'no-mappings-message';
+  message.innerHTML = `
+    <span class="material-symbols-rounded">info</span>
+    <p>No value mappings available. This may occur if the controlling field could not be found or does not have picklist values configured.</p>
+  `;
+  section.appendChild(message);
+
+  return section;
 }
 
 function formatValue(value) {
@@ -666,4 +888,303 @@ function doExport() {
 
   console.log('[OrgCompare] Exported results to', filename);
   hideExportModal();
+}
+
+// ============================================
+// Collapse/Expand Functions
+// ============================================
+
+function toggleSection(metadataType, itemsContainer, header) {
+  const isCurrentlyCollapsed = itemsContainer.classList.contains('hidden');
+
+  itemsContainer.classList.toggle('hidden');
+
+  // Update icon
+  const collapseIcon = header.querySelector('.collapse-icon');
+  collapseIcon.textContent = isCurrentlyCollapsed ? 'expand_less' : 'expand_more';
+
+  // Update state
+  if (isCurrentlyCollapsed) {
+    collapsedSections.delete(metadataType);
+  } else {
+    collapsedSections.add(metadataType);
+  }
+
+  // Save state to localStorage
+  saveCollapsedState();
+}
+
+function expandAllSections() {
+  const sections = document.querySelectorAll('.comparison-section');
+  sections.forEach(section => {
+    const itemsContainer = section.querySelector('.comparison-items');
+    const header = section.querySelector('.comparison-header');
+    const collapseIcon = header.querySelector('.collapse-icon');
+    const metadataType = section.dataset.type;
+
+    // Expand section
+    itemsContainer.classList.remove('hidden');
+    collapseIcon.textContent = 'expand_less';
+    collapsedSections.delete(metadataType);
+
+    // Expand all items within the section
+    const items = section.querySelectorAll('.comparison-item');
+    items.forEach(item => {
+      const itemDetails = item.querySelector('.item-details');
+      const itemIcon = item.querySelector('.item-collapse-icon');
+      if (itemDetails && itemIcon) {
+        itemDetails.classList.remove('collapsed');
+        itemIcon.textContent = 'expand_less';
+      }
+    });
+  });
+
+  saveCollapsedState();
+}
+
+function collapseAllSections() {
+  const sections = document.querySelectorAll('.comparison-section');
+  sections.forEach(section => {
+    const itemsContainer = section.querySelector('.comparison-items');
+    const header = section.querySelector('.comparison-header');
+    const collapseIcon = header.querySelector('.collapse-icon');
+    const metadataType = section.dataset.type;
+
+    // Collapse section
+    itemsContainer.classList.add('hidden');
+    collapseIcon.textContent = 'expand_more';
+    collapsedSections.add(metadataType);
+
+    // Collapse all items within the section
+    const items = section.querySelectorAll('.comparison-item');
+    items.forEach(item => {
+      const itemDetails = item.querySelector('.item-details');
+      const itemIcon = item.querySelector('.item-collapse-icon');
+      if (itemDetails && itemIcon) {
+        itemDetails.classList.add('collapsed');
+        itemIcon.textContent = 'expand_more';
+      }
+    });
+  });
+
+  saveCollapsedState();
+}
+
+function saveCollapsedState() {
+  try {
+    const state = Array.from(collapsedSections);
+    localStorage.setItem('orgCompare_collapsedSections', JSON.stringify(state));
+  } catch (error) {
+    console.warn('[OrgCompare] Failed to save collapsed state:', error);
+  }
+}
+
+function loadCollapsedState() {
+  try {
+    const saved = localStorage.getItem('orgCompare_collapsedSections');
+    if (saved) {
+      collapsedSections = new Set(JSON.parse(saved));
+    }
+  } catch (error) {
+    console.warn('[OrgCompare] Failed to load collapsed state:', error);
+    collapsedSections = new Set();
+  }
+}
+
+// ============================================
+// View Toggle Functions
+// ============================================
+
+function switchView(view) {
+  currentView = view;
+
+  const comparisonViewBtn = document.getElementById('comparisonViewBtn');
+  const xmlViewBtn = document.getElementById('xmlViewBtn');
+  const resultsContainer = document.getElementById('resultsContainer');
+  const xmlViewerContainer = document.getElementById('xmlViewerContainer');
+
+  if (view === 'comparison') {
+    // Show comparison view
+    comparisonViewBtn.classList.add('active');
+    xmlViewBtn.classList.remove('active');
+    resultsContainer.classList.remove('hidden');
+    xmlViewerContainer.classList.add('hidden');
+  } else if (view === 'xml') {
+    // Show XML view
+    comparisonViewBtn.classList.remove('active');
+    xmlViewBtn.classList.add('active');
+    resultsContainer.classList.add('hidden');
+    xmlViewerContainer.classList.remove('hidden');
+
+    // Load XML data if not already loaded
+    if (!xmlData) {
+      loadXmlView();
+    }
+  }
+}
+
+async function loadXmlView() {
+  const sourceXmlContent = document.getElementById('sourceXmlContent').querySelector('code');
+  const targetXmlContent = document.getElementById('targetXmlContent').querySelector('code');
+
+  try {
+    sourceXmlContent.textContent = 'Loading XML...';
+    targetXmlContent.textContent = 'Loading XML...';
+
+    // Get XML for selected metadata types
+    const selectedTypes = getSelectedMetadataTypes();
+    const options = {
+      objectName: document.getElementById('objectSelect').value || null,
+      fieldName: document.getElementById('fieldSelect').value || null,
+      permissionType: document.getElementById('permissionTypeSelect').value || null,
+      permissionId: document.getElementById('permissionItemSelect').value || null
+    };
+
+    // Fetch XML metadata for both orgs
+    const [sourceXml, targetXml] = await Promise.all([
+      OrgCompareAPI.getMetadataAsXml(sourceSession, selectedTypes, options),
+      OrgCompareAPI.getMetadataAsXml(targetSession, selectedTypes, options)
+    ]);
+
+    // Store XML data
+    xmlData = {
+      source: sourceXml,
+      target: targetXml
+    };
+
+    // Format and apply diff highlighting
+    const formattedSource = formatXml(sourceXml);
+    const formattedTarget = formatXml(targetXml);
+
+    // Generate diff-highlighted XML
+    const { sourceDiff, targetDiff } = generateXmlDiff(formattedSource, formattedTarget);
+
+    sourceXmlContent.innerHTML = sourceDiff;
+    targetXmlContent.innerHTML = targetDiff;
+
+  } catch (error) {
+    console.error('[OrgCompare] Error loading XML view:', error);
+    sourceXmlContent.textContent = `Error loading XML: ${error.message}`;
+    targetXmlContent.textContent = `Error loading XML: ${error.message}`;
+  }
+}
+
+function formatXml(xml) {
+  // Pretty-print XML with indentation
+  if (!xml) return '';
+
+  let formatted = '';
+  let indent = 0;
+  const tab = '  ';
+
+  xml.split(/>\s*</).forEach(node => {
+    if (node.match(/^\/\w/)) indent--; // Closing tag
+    formatted += tab.repeat(indent) + '<' + node + '>\n';
+    if (node.match(/^<?\w[^>]*[^\/]$/)) indent++; // Opening tag
+  });
+
+  return formatted.substring(1, formatted.length - 2);
+}
+
+function generateXmlDiff(sourceXml, targetXml) {
+  // Split into lines
+  const sourceLines = sourceXml.split('\n');
+  const targetLines = targetXml.split('\n');
+
+  // Build line maps for quick lookup
+  const sourceLineSet = new Set(sourceLines.map(line => line.trim()));
+  const targetLineSet = new Set(targetLines.map(line => line.trim()));
+
+  // Generate highlighted source (lines not in target = red)
+  const sourceDiff = sourceLines.map(line => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) return line; // Keep empty lines as is
+
+    // Check if this line exists in target
+    const isInTarget = targetLineSet.has(trimmedLine);
+
+    if (!isInTarget && trimmedLine.startsWith('<members>')) {
+      // This line was removed (red background)
+      return `<span class="xml-line-removed">${escapeHtml(line)}</span>`;
+    }
+
+    return escapeHtml(line);
+  }).join('\n');
+
+  // Generate highlighted target (lines not in source = green)
+  const targetDiff = targetLines.map(line => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) return line; // Keep empty lines as is
+
+    // Check if this line exists in source
+    const isInSource = sourceLineSet.has(trimmedLine);
+
+    if (!isInSource && trimmedLine.startsWith('<members>')) {
+      // This line was added (green background)
+      return `<span class="xml-line-added">${escapeHtml(line)}</span>`;
+    }
+
+    return escapeHtml(line);
+  }).join('\n');
+
+  // Apply syntax highlighting on top of diff highlighting
+  return {
+    sourceDiff: applySyntaxHighlighting(sourceDiff),
+    targetDiff: applySyntaxHighlighting(targetDiff)
+  };
+}
+
+function applySyntaxHighlighting(html) {
+  // Highlight XML tags
+  html = html.replace(/(&lt;\/?)(\w+)(.*?)(&gt;)/g,
+    '<span class="xml-bracket">$1</span><span class="xml-tag">$2</span><span class="xml-attr">$3</span><span class="xml-bracket">$4</span>');
+
+  // Highlight attribute values
+  html = html.replace(/=&quot;([^&]*)&quot;/g,
+    '=<span class="xml-value">&quot;$1&quot;</span>');
+
+  return html;
+}
+
+function copyXml(side) {
+  if (!xmlData) {
+    alert('No XML data available. Please load the XML view first.');
+    return;
+  }
+
+  const xml = side === 'source' ? xmlData.source : xmlData.target;
+
+  navigator.clipboard.writeText(xml).then(() => {
+    // Show temporary success message
+    const btn = document.getElementById(side === 'source' ? 'copySourceXmlBtn' : 'copyTargetXmlBtn');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="material-symbols-rounded">check</span>';
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+    }, 2000);
+  }).catch(error => {
+    console.error('[OrgCompare] Failed to copy XML:', error);
+    alert('Failed to copy XML to clipboard');
+  });
+}
+
+function downloadXml(side) {
+  if (!xmlData) {
+    alert('No XML data available. Please load the XML view first.');
+    return;
+  }
+
+  const xml = side === 'source' ? xmlData.source : xmlData.target;
+  const orgName = side === 'source' ? sourceSession.orgName : targetSession.orgName;
+  const filename = `${orgName || 'org'}_metadata_${Date.now()}.xml`;
+
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  console.log('[OrgCompare] Downloaded XML to', filename);
 }

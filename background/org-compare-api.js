@@ -3,6 +3,7 @@
 // Uses Chrome APIs for tab/session detection and XMLHttpRequest for Salesforce API calls
 
 import SessionManager from './session-manager.js';
+import MetadataAPI from './metadata-api.js';
 
 class OrgCompareAPI {
   /**
@@ -360,32 +361,131 @@ class OrgCompareAPI {
 
   /**
    * Get field dependencies for an object (controlling/dependent picklists)
+   * Uses Metadata API to get explicit value mappings (same as Export Dependencies)
    * @param {object} session - Session object
    * @param {string} objectName - API name of the object
-   * @returns {Promise<Array>} Array of dependency relationships
+   * @returns {Promise<Array>} Array of dependency relationships with value mappings
    */
   static async getFieldDependencies(session, objectName) {
-
-    const metadata = await this.getObjectMetadata(session, objectName);
+    // Use Metadata API to get valueSet information (same as Export Dependencies)
+    const metadata = await MetadataAPI.readObject(session, objectName);
     const dependencies = [];
 
-    for (const field of metadata.fields) {
-      if (field.picklistValues && field.picklistValues.length > 0) {
-        // Check if this field is controlled by another
-        const hasController = field.picklistValues.some(v => v.validFor);
+    // Find fields with valueSet.controllingField (dependent picklists)
+    metadata.fields
+      .filter(f => f.valueSet?.controllingField)
+      .forEach(field => {
+        // Group mappings by controlling value
+        const mappingsByControllingValue = new Map();
 
-        if (hasController) {
-          dependencies.push({
-            dependentField: field.name,
-            dependentLabel: field.label,
-            controllingField: field.controllerName || 'Unknown',
-            valuesCount: field.picklistValues.filter(v => v.active).length
+        // Process valueSettings to build mappings
+        field.valueSet.valueSettings.forEach(vs => {
+          const controllingValues = Array.isArray(vs.controllingFieldValue)
+            ? vs.controllingFieldValue
+            : [vs.controllingFieldValue];
+
+          controllingValues.forEach(controllingValue => {
+            if (!mappingsByControllingValue.has(controllingValue)) {
+              mappingsByControllingValue.set(controllingValue, []);
+            }
+            mappingsByControllingValue.get(controllingValue).push({
+              value: vs.valueName,
+              label: vs.valueName, // Metadata API doesn't provide labels, use value
+              active: true // Assume active from valueSettings
+            });
           });
-        }
-      }
-    }
+        });
+
+        // Convert map to array format
+        const valueMappings = Array.from(mappingsByControllingValue.entries()).map(([controllingValue, dependentValues]) => ({
+          controllingValue: controllingValue,
+          controllingLabel: controllingValue, // Metadata API doesn't provide labels
+          controllingActive: true,
+          dependentValues: dependentValues,
+          dependentCount: dependentValues.length
+        }));
+
+        dependencies.push({
+          dependentField: field.fullName,
+          dependentLabel: field.label || field.fullName,
+          controllingField: field.valueSet.controllingField,
+          controllingLabel: field.valueSet.controllingField, // Use field name as label
+          valuesCount: field.valueSet.valueSettings.length,
+          valueMappings: valueMappings
+        });
+      });
 
     return dependencies;
+  }
+
+  /**
+   * Decode dependency mappings from validFor bitfields
+   * @param {Array} controllingValues - Controlling field picklist values
+   * @param {Array} dependentValues - Dependent field picklist values
+   * @returns {Array} Array of mappings showing which controlling values enable which dependent values
+   */
+  static decodeDependencyMappings(controllingValues, dependentValues) {
+    const mappings = [];
+
+    controllingValues.forEach((controllingValue, controllingIndex) => {
+      const enabledDependentValues = [];
+
+      dependentValues.forEach((dependentValue, dependentIndex) => {
+        if (dependentValue.validFor) {
+          // validFor is a base64-encoded bitfield
+          // Each bit represents whether this dependent value is valid for a controlling value
+          if (this.isDependentValueValidFor(dependentValue.validFor, controllingIndex)) {
+            enabledDependentValues.push({
+              value: dependentValue.value,
+              label: dependentValue.label,
+              active: dependentValue.active
+            });
+          }
+        }
+      });
+
+      if (enabledDependentValues.length > 0) {
+        mappings.push({
+          controllingValue: controllingValue.value,
+          controllingLabel: controllingValue.label,
+          controllingActive: controllingValue.active,
+          dependentValues: enabledDependentValues,
+          dependentCount: enabledDependentValues.length
+        });
+      }
+    });
+
+    return mappings;
+  }
+
+  /**
+   * Check if a dependent value is valid for a specific controlling value index
+   * @param {string} validForBase64 - Base64-encoded bitfield from Salesforce
+   * @param {number} controllingIndex - Index of the controlling value
+   * @returns {boolean} True if valid for this controlling value
+   */
+  static isDependentValueValidFor(validForBase64, controllingIndex) {
+    try {
+      // Decode base64 to binary string
+      const binaryString = atob(validForBase64);
+
+      // Calculate which byte and bit to check
+      const byteIndex = Math.floor(controllingIndex / 8);
+      const bitIndex = controllingIndex % 8;
+
+      // Get the byte (as character code)
+      if (byteIndex >= binaryString.length) {
+        return false;
+      }
+
+      const byte = binaryString.charCodeAt(byteIndex);
+
+      // Check if the bit is set (bits are ordered from least significant to most significant)
+      return (byte & (1 << bitIndex)) !== 0;
+    } catch (error) {
+      console.error('[OrgCompareAPI] Error decoding validFor:', error);
+      return false;
+    }
   }
 
   /**
@@ -692,12 +792,7 @@ class OrgCompareAPI {
         }
         sourceData = await this.getFieldDependencies(sourceSession, options.objectName);
         targetData = await this.getFieldDependencies(targetSession, options.objectName);
-        return this.compareArrayByKey(
-          sourceData,
-          targetData,
-          'dependentField',
-          ['controllingField', 'valuesCount']
-        );
+        return this.compareDependencies(sourceData, targetData);
 
       case 'permissions':
         if (!options.permissionId || !options.permissionType) {
@@ -718,6 +813,171 @@ class OrgCompareAPI {
       default:
         throw new Error(`Unknown metadata type: ${metadataType}`);
     }
+  }
+
+  /**
+   * Compare field dependencies with detailed value mapping comparison
+   * @param {Array} sourceDependencies - Source org dependencies
+   * @param {Array} targetDependencies - Target org dependencies
+   * @returns {object} Comparison result with value mapping details
+   */
+  static compareDependencies(sourceDependencies, targetDependencies) {
+    const result = {
+      totalItems: 0,
+      matches: 0,
+      differences: 0,
+      sourceOnly: 0,
+      targetOnly: 0,
+      items: []
+    };
+
+    // Build maps for quick lookup
+    const sourceMap = new Map();
+    const targetMap = new Map();
+
+    sourceDependencies.forEach(dep => sourceMap.set(dep.dependentField, dep));
+    targetDependencies.forEach(dep => targetMap.set(dep.dependentField, dep));
+
+    // Get all unique dependent fields
+    const allFields = new Set([...sourceMap.keys(), ...targetMap.keys()]);
+    result.totalItems = allFields.size;
+
+    // Compare each dependency
+    for (const dependentField of allFields) {
+      const sourceDep = sourceMap.get(dependentField);
+      const targetDep = targetMap.get(dependentField);
+
+      const comparisonItem = {
+        key: dependentField,
+        status: '',
+        sourceValues: {},
+        targetValues: {},
+        differences: [],
+        valueMappingDifferences: [] // NEW: Specific differences in value mappings
+      };
+
+      if (sourceDep && targetDep) {
+        // Both have the dependency - compare details
+        let hasDifference = false;
+
+        // Compare controlling field
+        comparisonItem.sourceValues.controllingField = sourceDep.controllingField;
+        comparisonItem.targetValues.controllingField = targetDep.controllingField;
+        comparisonItem.sourceValues.controllingLabel = sourceDep.controllingLabel;
+        comparisonItem.targetValues.controllingLabel = targetDep.controllingLabel;
+
+        if (sourceDep.controllingField !== targetDep.controllingField) {
+          hasDifference = true;
+          comparisonItem.differences.push('controllingField');
+        }
+
+        // Compare value mappings in detail
+        comparisonItem.sourceValues.valueMappings = sourceDep.valueMappings;
+        comparisonItem.targetValues.valueMappings = targetDep.valueMappings;
+
+        const mappingDiffs = this.compareValueMappings(
+          sourceDep.valueMappings,
+          targetDep.valueMappings
+        );
+
+        if (mappingDiffs.length > 0) {
+          hasDifference = true;
+          comparisonItem.differences.push('valueMappings');
+          comparisonItem.valueMappingDifferences = mappingDiffs;
+        }
+
+        if (hasDifference) {
+          comparisonItem.status = 'different';
+          result.differences++;
+        } else {
+          comparisonItem.status = 'match';
+          result.matches++;
+        }
+
+      } else if (sourceDep) {
+        // Dependency only in source
+        comparisonItem.status = 'sourceOnly';
+        result.sourceOnly++;
+        comparisonItem.sourceValues = {
+          controllingField: sourceDep.controllingField,
+          controllingLabel: sourceDep.controllingLabel,
+          valueMappings: sourceDep.valueMappings
+        };
+        comparisonItem.targetValues = { valueMappings: [] };
+
+      } else {
+        // Dependency only in target
+        comparisonItem.status = 'targetOnly';
+        result.targetOnly++;
+        comparisonItem.sourceValues = { valueMappings: [] };
+        comparisonItem.targetValues = {
+          controllingField: targetDep.controllingField,
+          controllingLabel: targetDep.controllingLabel,
+          valueMappings: targetDep.valueMappings
+        };
+      }
+
+      result.items.push(comparisonItem);
+    }
+
+    // Sort items: differences first, then sourceOnly, then targetOnly, then matches
+    const statusOrder = { different: 0, sourceOnly: 1, targetOnly: 2, match: 3 };
+    result.items.sort((a, b) => {
+      const orderDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (orderDiff !== 0) return orderDiff;
+      return a.key.localeCompare(b.key);
+    });
+
+    return result;
+  }
+
+  /**
+   * Compare value mappings between two dependencies
+   * @param {Array} sourceMappings - Source value mappings
+   * @param {Array} targetMappings - Target value mappings
+   * @returns {Array} Array of differences found
+   */
+  static compareValueMappings(sourceMappings, targetMappings) {
+    const differences = [];
+
+    // Build maps by controlling value
+    const sourceMap = new Map();
+    const targetMap = new Map();
+
+    sourceMappings.forEach(mapping => {
+      sourceMap.set(mapping.controllingValue, mapping.dependentValues.map(v => v.value));
+    });
+
+    targetMappings.forEach(mapping => {
+      targetMap.set(mapping.controllingValue, mapping.dependentValues.map(v => v.value));
+    });
+
+    // Get all unique controlling values
+    const allControllingValues = new Set([...sourceMap.keys(), ...targetMap.keys()]);
+
+    for (const controllingValue of allControllingValues) {
+      const sourceDepValues = sourceMap.get(controllingValue) || [];
+      const targetDepValues = targetMap.get(controllingValue) || [];
+
+      // Find differences
+      const sourceSet = new Set(sourceDepValues);
+      const targetSet = new Set(targetDepValues);
+
+      const onlyInSource = sourceDepValues.filter(v => !targetSet.has(v));
+      const onlyInTarget = targetDepValues.filter(v => !sourceSet.has(v));
+
+      if (onlyInSource.length > 0 || onlyInTarget.length > 0) {
+        differences.push({
+          controllingValue,
+          onlyInSource,
+          onlyInTarget,
+          sourceCount: sourceDepValues.length,
+          targetCount: targetDepValues.length
+        });
+      }
+    }
+
+    return differences;
   }
 
   /**
@@ -1135,6 +1395,128 @@ class OrgCompareAPI {
       targetOnly: results.summary.targetOnly,
       metadataTypes: Object.keys(results.comparisons).length
     };
+  }
+
+  /**
+   * Get metadata as XML for display in XML viewer
+   * @param {object} session - Session object
+   * @param {Array} metadataTypes - Array of metadata types to retrieve
+   * @param {object} options - Options for metadata retrieval
+   * @returns {Promise<string>} XML string
+   */
+  static async getMetadataAsXml(session, metadataTypes, options = {}) {
+    let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xmlContent += '<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n';
+
+    for (const metadataType of metadataTypes) {
+      try {
+        const typeXml = await this.getMetadataTypeAsXml(session, metadataType, options);
+        xmlContent += typeXml;
+      } catch (error) {
+        console.error(`[OrgCompareAPI] Error getting XML for ${metadataType}:`, error);
+        xmlContent += `  <!-- Error retrieving ${metadataType}: ${error.message} -->\n`;
+      }
+    }
+
+    xmlContent += '  <version>59.0</version>\n';
+    xmlContent += '</Package>';
+
+    return xmlContent;
+  }
+
+  /**
+   * Get XML for a specific metadata type
+   * @param {object} session - Session object
+   * @param {string} metadataType - Metadata type
+   * @param {object} options - Options
+   * @returns {Promise<string>} XML string for this type
+   */
+  static async getMetadataTypeAsXml(session, metadataType, options) {
+    let xml = '';
+
+    switch (metadataType) {
+      case 'objects':
+        const objects = await this.getObjects(session);
+        xml += '  <types>\n';
+        objects.forEach(obj => {
+          if (obj.custom) {
+            xml += `    <members>${obj.name}</members>\n`;
+          }
+        });
+        xml += '    <name>CustomObject</name>\n';
+        xml += '  </types>\n';
+        break;
+
+      case 'fields':
+        if (options.objectName) {
+          const metadata = await this.getObjectMetadata(session, options.objectName);
+          xml += '  <types>\n';
+          metadata.fields.forEach(field => {
+            if (field.custom) {
+              xml += `    <members>${options.objectName}.${field.name}</members>\n`;
+            }
+          });
+          xml += '    <name>CustomField</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'validationRules':
+        const rules = await this.getValidationRules(session, options.objectName);
+        if (rules.length > 0) {
+          xml += '  <types>\n';
+          rules.forEach(rule => {
+            xml += `    <members>${rule.object}.${rule.name}</members>\n`;
+          });
+          xml += '    <name>ValidationRule</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'flows':
+        const flows = await this.getFlows(session);
+        if (flows.length > 0) {
+          xml += '  <types>\n';
+          flows.forEach(flow => {
+            xml += `    <members>${flow.name}</members>\n`;
+          });
+          xml += '    <name>Flow</name>\n';
+          xml += '  </types>\n';
+        }
+        break;
+
+      case 'permissions':
+        if (options.permissionType && options.permissionId) {
+          const perms = await this.getAllPermissions(session, options.permissionId, options.permissionType);
+          xml += '  <types>\n';
+
+          if (options.permissionType === 'Profile') {
+            // Get profile name
+            const profiles = await this.getProfiles(session);
+            const profile = profiles.find(p => p.id === options.permissionId);
+            if (profile) {
+              xml += `    <members>${profile.name}</members>\n`;
+            }
+            xml += '    <name>Profile</name>\n';
+          } else {
+            // Get permission set name
+            const permSets = await this.getPermissionSets(session);
+            const permSet = permSets.find(ps => ps.id === options.permissionId);
+            if (permSet) {
+              xml += `    <members>${permSet.name}</members>\n`;
+            }
+            xml += '    <name>PermissionSet</name>\n';
+          }
+
+          xml += '  </types>\n';
+        }
+        break;
+
+      default:
+        xml += `  <!-- ${metadataType} XML generation not implemented -->\n`;
+    }
+
+    return xml;
   }
 }
 

@@ -264,6 +264,28 @@
       <div class="filter-group search-group">
         <input type="text" id="searchInput" placeholder="Search items...">
       </div>
+      <div class="filter-group">
+        <button id="expandAllBtn" class="btn btn-secondary btn-sm">
+          <span class="material-symbols-rounded">unfold_more</span>
+          Expand All
+        </button>
+        <button id="collapseAllBtn" class="btn btn-secondary btn-sm">
+          <span class="material-symbols-rounded">unfold_less</span>
+          Collapse All
+        </button>
+      </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div id="viewToggle" class="view-toggle hidden">
+      <button id="comparisonViewBtn" class="view-toggle-btn active">
+        <span class="material-symbols-rounded">compare</span>
+        Comparison View
+      </button>
+      <button id="xmlViewBtn" class="view-toggle-btn">
+        <span class="material-symbols-rounded">code</span>
+        XML View
+      </button>
     </div>
 
     <!-- Results Container -->
@@ -271,6 +293,47 @@
       <div class="empty-state">
         <span class="material-symbols-rounded">compare_arrows</span>
         <p>Select two orgs and metadata types, then click "Run Comparison" to start</p>
+      </div>
+    </div>
+
+    <!-- XML Viewer Container -->
+    <div id="xmlViewerContainer" class="xml-viewer-container hidden">
+      <div class="xml-panes">
+        <div class="xml-pane">
+          <div class="xml-pane-header">
+            <h3>
+              <span class="material-symbols-rounded">source</span>
+              Source Org XML
+            </h3>
+            <button class="btn btn-icon btn-sm" id="copySourceXmlBtn" title="Copy XML">
+              <span class="material-symbols-rounded">content_copy</span>
+            </button>
+            <button class="btn btn-icon btn-sm" id="downloadSourceXmlBtn" title="Download XML">
+              <span class="material-symbols-rounded">download</span>
+            </button>
+          </div>
+          <div class="xml-content" id="sourceXmlContent">
+            <pre><code></code></pre>
+          </div>
+        </div>
+
+        <div class="xml-pane">
+          <div class="xml-pane-header">
+            <h3>
+              <span class="material-symbols-rounded">target</span>
+              Target Org XML
+            </h3>
+            <button class="btn btn-icon btn-sm" id="copyTargetXmlBtn" title="Copy XML">
+              <span class="material-symbols-rounded">content_copy</span>
+            </button>
+            <button class="btn btn-icon btn-sm" id="downloadTargetXmlBtn" title="Download XML">
+              <span class="material-symbols-rounded">download</span>
+            </button>
+          </div>
+          <div class="xml-content" id="targetXmlContent">
+            <pre><code></code></pre>
+          </div>
+        </div>
       </div>
     </div>
 

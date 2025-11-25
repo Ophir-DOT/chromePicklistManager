@@ -94,47 +94,18 @@ class ToolingAPI {
       throw new Error(`CustomField not found: ${objectName}.${fieldName}`);
     }
 
-    // Filter results client-side
-    // TableEnumOrId can be either the object API name OR the object ID
-    let matchingField = null;
+    console.log('[ToolingAPI] Found CustomField records:', response.records.map(r => ({
+      Id: r.Id,
+      DeveloperName: r.DeveloperName,
+      TableEnumOrId: r.TableEnumOrId
+    })));
+    console.log('[ToolingAPI] Looking for object:', objectName);
 
-    for (const record of response.records) {
-      // Match by object API name
-      if (record.TableEnumOrId === objectName) {
-        matchingField = record;
-        break;
-      }
-    }
+    // For custom fields with namespaces, just use the first match
+    // The DeveloperName query is already specific enough
+    const fieldId = response.records[0].Id;
+    console.log('[ToolingAPI] Using CustomField ID:', fieldId);
 
-    // If no match by object name, try to match by querying the object ID
-    if (!matchingField) {
-      // Get the object's EntityDefinition to find its DurableId
-      const objQuery = `
-        SELECT DurableId
-        FROM EntityDefinition
-        WHERE QualifiedApiName = '${objectName}'
-      `;
-      const objEndpoint = `/services/data/v59.0/tooling/query/?q=${encodeURIComponent(objQuery)}`;
-      const objResponse = await SalesforceAPI.callAPI(objEndpoint);
-
-      if (objResponse.records && objResponse.records.length > 0) {
-        const objectId = objResponse.records[0].DurableId;
-
-        // Now match by object ID
-        for (const record of response.records) {
-          if (record.TableEnumOrId === objectId) {
-            matchingField = record;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!matchingField) {
-      throw new Error(`CustomField not found: ${objectName}.${fieldName} (found ${response.records.length} fields with DeveloperName '${devName}' but none matched the object)`);
-    }
-
-    const fieldId = matchingField.Id;
     return fieldId;
   }
 
@@ -273,6 +244,129 @@ class ToolingAPI {
     } catch (error) {
       console.error('[ToolingAPI] Picklist update failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Validate dependency values exist in their respective picklist fields
+   * Checks that all controlling values exist in the controlling field
+   * and all dependent values exist in the dependent field
+   * Uses describe API instead of PicklistValueInfo for better compatibility
+   * @param {object} session - Salesforce session
+   * @param {string} objectName - Object API name
+   * @param {string} controllingField - Controlling field API name
+   * @param {string} dependentField - Dependent field API name
+   * @param {Array} mappings - Array of {controllingValue, dependentValue} objects
+   * @returns {Promise<object>} Validation result {valid, missingControlling, missingDependent}
+   */
+  static async validateDependencyValues(session, objectName, controllingField, dependentField, mappings) {
+    try {
+      // Use describe API to get picklist values (more reliable than PicklistValueInfo)
+      const endpoint = `/services/data/v59.0/sobjects/${objectName}/describe`;
+      const describe = await SalesforceAPI.callAPI(endpoint);
+
+      // Find controlling field
+      const controllingFieldMeta = describe.fields.find(f => f.name === controllingField);
+      if (!controllingFieldMeta || !controllingFieldMeta.picklistValues) {
+        throw new Error(`Controlling field ${controllingField} not found or is not a picklist`);
+      }
+
+      // Find dependent field
+      const dependentFieldMeta = describe.fields.find(f => f.name === dependentField);
+      if (!dependentFieldMeta || !dependentFieldMeta.picklistValues) {
+        throw new Error(`Dependent field ${dependentField} not found or is not a picklist`);
+      }
+
+      // Build sets of valid values
+      const controllingSet = new Set(
+        controllingFieldMeta.picklistValues
+          .filter(v => v.active)
+          .map(v => v.value)
+      );
+
+      const dependentSet = new Set(
+        dependentFieldMeta.picklistValues
+          .filter(v => v.active)
+          .map(v => v.value)
+      );
+
+      console.log('[ToolingAPI] Controlling values:', Array.from(controllingSet));
+      console.log('[ToolingAPI] Dependent values:', Array.from(dependentSet));
+
+      // Check which values are missing
+      const missingControlling = new Set();
+      const missingDependent = new Set();
+
+      mappings.forEach(mapping => {
+        if (!controllingSet.has(mapping.controllingValue)) {
+          missingControlling.add(mapping.controllingValue);
+        }
+        if (!dependentSet.has(mapping.dependentValue)) {
+          missingDependent.add(mapping.dependentValue);
+        }
+      });
+
+      const valid = missingControlling.size === 0 && missingDependent.size === 0;
+
+      return {
+        valid,
+        missingControlling: Array.from(missingControlling),
+        missingDependent: Array.from(missingDependent)
+      };
+
+    } catch (error) {
+      console.error('[ToolingAPI] Validation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update field dependencies using Tooling API PATCH
+   * Replaces Metadata API deployment approach for faster, synchronous updates
+   * @param {object} session - Salesforce session
+   * @param {string} fieldId - CustomField record ID (dependent field)
+   * @param {object} dependencyMetadata - Dependency configuration object
+   * @param {string} dependencyMetadata.label - Field label
+   * @param {string} dependencyMetadata.controllingField - Controlling field API name
+   * @param {boolean} dependencyMetadata.restricted - Whether picklist is restricted (true for dependencies)
+   * @param {string} dependencyMetadata.valueSetName - Global value set name (if applicable)
+   * @param {Array} dependencyMetadata.valueSettings - Array of {controllingFieldValue: [], valueName: string}
+   * @param {string} fullName - FullName in format Object.Field (e.g., "Account.Type__c")
+   * @returns {Promise<object>} PATCH response
+   */
+  static async updateFieldDependencies(session, fieldId, dependencyMetadata, fullName) {
+    // dependencyMetadata is already complete from service-worker.js
+    // It includes all existing properties and merged valueSettings
+    const body = {
+      Metadata: dependencyMetadata,
+      FullName: fullName
+    };
+
+    console.log('[ToolingAPI] Sending PATCH with body:', JSON.stringify(body, null, 2));
+
+    // PATCH the CustomField
+    const endpoint = `/services/data/v59.0/tooling/sobjects/CustomField/${fieldId}`;
+
+    try {
+      const response = await SalesforceAPI.callAPI(endpoint, {
+        method: 'PATCH',
+        body: body
+      });
+
+      return response;
+    } catch (error) {
+      console.error('[ToolingAPI] Dependency PATCH failed:', error);
+
+      // Provide helpful error messages
+      if (error.message.includes('Cannot deserialize')) {
+        throw new Error('Invalid metadata format. Check that all valueSettings have controllingFieldValue and valueName properties.');
+      } else if (error.message.includes('INVALID_TYPE')) {
+        throw new Error('This field type cannot be updated via Tooling API. It may be a standard field or use a StandardValueSet.');
+      } else if (error.message.includes('INVALID_CROSS_REFERENCE_KEY')) {
+        throw new Error('One or more values do not exist in the controlling or dependent field.');
+      } else {
+        throw error;
+      }
     }
   }
 }

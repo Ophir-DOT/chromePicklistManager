@@ -1,4 +1,5 @@
 // Import API client - runs in popup extension context, can make fetch calls with headers
+import { escapeHtml } from '../shared/utils.js';
 import SalesforceAPI from '../background/api-client.js';
 import MetadataAPI from '../background/metadata-api.js';
 import ToolingAPI from '../background/tooling-api.js';
@@ -53,6 +54,7 @@ function displayVersion() {
 async function checkConnection() {
   const statusIndicator = document.querySelector('.status-indicator');
   const statusText = document.querySelector('.status-text');
+  let isConnected = false;
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -60,6 +62,7 @@ async function checkConnection() {
     if (!tab || !tab.url) {
       statusIndicator.className = 'status-indicator disconnected';
       statusText.textContent = 'No active tab';
+      disableAllFeatures('No active tab detected');
       return;
     }
 
@@ -71,6 +74,8 @@ async function checkConnection() {
     if (!isSalesforce) {
       statusIndicator.className = 'status-indicator disconnected';
       statusText.textContent = 'Not on Salesforce';
+      document.getElementById('orgUrl').textContent = 'N/A';
+      disableAllFeatures('Please open this extension from a Salesforce tab');
       return;
     }
 
@@ -81,94 +86,123 @@ async function checkConnection() {
       url: tab.url
     });
 
-    if (response.success) {
+    if (response.success && response.data && !response.data.error) {
       statusIndicator.className = 'status-indicator connected';
       statusText.textContent = 'Connected';
       document.getElementById('orgUrl').textContent = response.data.instanceUrl;
+      isConnected = true;
+      enableAllFeatures();
     } else {
+      const errorMsg = response.data?.message || response.error || 'Not connected';
       statusIndicator.className = 'status-indicator disconnected';
-      statusText.textContent = response.error || 'Not connected';
+      statusText.textContent = errorMsg;
+      document.getElementById('orgUrl').textContent = 'N/A';
+      disableAllFeatures(errorMsg);
     }
   } catch (error) {
     statusIndicator.className = 'status-indicator disconnected';
     statusText.textContent = 'Error: ' + error.message;
+    document.getElementById('orgUrl').textContent = 'N/A';
     console.error('Connection check failed:', error);
+    disableAllFeatures('Connection error: ' + error.message);
   }
+}
+
+/**
+ * Disable all feature buttons and show warning message
+ */
+function disableAllFeatures(reason) {
+  const featureButtons = [
+    'picklistManagementBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
+    'deploymentHistoryBtn', 'exportFieldsBtn'
+  ];
+
+  featureButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+      btn.title = reason || 'Not connected to Salesforce';
+    }
+  });
+
+  console.log('[Popup] All features disabled:', reason);
+}
+
+/**
+ * Enable all feature buttons
+ */
+function enableAllFeatures() {
+  const featureButtons = [
+    'picklistManagementBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
+    'deploymentHistoryBtn', 'exportFieldsBtn'
+  ];
+
+  featureButtons.forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+      btn.title = '';
+    }
+  });
+
+  console.log('[Popup] All features enabled');
 }
 
 function setupEventListeners() {
   // Main menu buttons
-  document.getElementById('exportBtn').addEventListener('click', showExportView);
-  document.getElementById('exportDepsBtn').addEventListener('click', showExportDepsView);
-  document.getElementById('picklistLoaderBtn').addEventListener('click', showPicklistLoader);
-  document.getElementById('dependencyLoaderBtn').addEventListener('click', showDependencyLoader);
+  document.getElementById('picklistManagementBtn').addEventListener('click', handlePicklistManagement);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
   document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
   document.getElementById('batchJobMonitorBtn').addEventListener('click', handleBatchJobMonitor);
   document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
   document.getElementById('permissionComparisonBtn').addEventListener('click', handlePermissionComparison);
   document.getElementById('orgCompareBtn').addEventListener('click', handleOrgCompare);
+  document.getElementById('deploymentHistoryBtn').addEventListener('click', handleDeploymentHistory);
   document.getElementById('exportFieldsBtn').addEventListener('click', handleExportFields);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
-
-  // Export view buttons
-  document.getElementById('backBtn').addEventListener('click', showMainView);
-  document.getElementById('selectAllBtn').addEventListener('click', selectAllObjects);
-  document.getElementById('clearBtn').addEventListener('click', clearSelection);
-  document.getElementById('doExportBtn').addEventListener('click', doExport);
-  document.getElementById('objectSearch').addEventListener('input', handleSearch);
-
-  // Export Dependencies view buttons
-  document.getElementById('backFromDepsBtn').addEventListener('click', showMainView);
-  document.getElementById('doExportDepsBtn').addEventListener('click', doExportDeps);
-  document.getElementById('depsObjectSearch').addEventListener('input', handleDepsSearch);
-
-  // Dependency Loader view buttons
-  document.getElementById('backFromDependencyLoaderBtn').addEventListener('click', showMainView);
-  document.getElementById('depsFileInput').addEventListener('change', handleDepsFileUpload);
-  document.getElementById('importDepsBtn').addEventListener('click', previewDepsImport);
-  document.getElementById('deployDepsBtn').addEventListener('click', deployDepsImport);
-
-  // Update Picklist view buttons
-  document.getElementById('backFromUpdateBtn').addEventListener('click', showMainView);
-  document.getElementById('updateObjectSelect').addEventListener('change', handleUpdateObjectChange);
-  document.getElementById('updateFieldSelect').addEventListener('change', handleUpdateFieldChange);
-  document.getElementById('csvTextarea').addEventListener('input', handleCSVInput);
-  document.getElementById('previewChangesBtn').addEventListener('click', previewPicklistChanges);
-  document.getElementById('deployPicklistBtn').addEventListener('click', deployPicklistChanges);
 
   // Share Files view buttons
   document.getElementById('backFromShareFilesBtn').addEventListener('click', showMainView);
 }
 
+//Handler for new unified Picklist Management page
+function handlePicklistManagement() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL('pages/picklist-management/picklist-management.html')
+  });
+}
+
+// ============================================
+// DEPRECATED: OLD PICKLIST MANAGEMENT FUNCTIONS
+// These functions have been migrated to pages/picklist-management/
+// Keeping them here temporarily for reference/rollback if needed
+// TODO: Remove in future version after stable release
+// ============================================
+
 async function showExportView() {
+  // DEPRECATED: This function is no longer used
+  // Picklist Management is now a full-page tool
+  console.warn('[Popup] showExportView is deprecated - use Picklist Management button instead');
+  return;
+
+  /* Original code kept for reference
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('exportView').classList.remove('hidden');
 
   // Load objects
   await loadObjects();
+  */
 }
 
 function showMainView() {
-  document.getElementById('exportView').classList.add('hidden');
-  document.getElementById('exportDepsView').classList.add('hidden');
-  document.getElementById('dependencyLoaderView').classList.add('hidden');
-  document.getElementById('updatePicklistView').classList.add('hidden');
   document.getElementById('shareFilesView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
-
-  // Reset state
-  selectedObjects.clear();
-  allObjects = [];
-  filteredObjects = [];
-
-  // Reset dependencies state
-  selectedDepsObject = null;
-  allDepsObjects = [];
-  filteredDepsObjects = [];
-
-  // Reset update picklist state
-  resetUpdatePicklistView();
 }
 
 async function loadObjects() {
@@ -202,7 +236,7 @@ async function loadObjects() {
     renderObjects(filteredObjects);
   } catch (error) {
     console.error('[Popup] Error loading objects:', error);
-    listEl.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    listEl.innerHTML = `<div class="error-message">Error: ${escapeHtml(error.message)}</div>`;
   } finally {
     loadingEl.style.display = 'none';
   }
@@ -566,7 +600,7 @@ async function loadDepsObjects() {
     renderDepsObjects(filteredDepsObjects);
   } catch (error) {
     console.error('[Popup] Error loading objects:', error);
-    listEl.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    listEl.innerHTML = `<div class="error-message">Error: ${escapeHtml(error.message)}</div>`;
   } finally {
     loadingEl.style.display = 'none';
   }
@@ -999,19 +1033,19 @@ async function previewDepsImport() {
     html += `<p style="margin-bottom: 12px;">Mode: ${modeLabel}</p>`;
 
     for (const [objectName, data] of Object.entries(parsedDepsData.objectData)) {
-      html += `<div class="preview-object"><strong>${objectName}</strong><ul>`;
+      html += `<div class="preview-object"><strong>${escapeHtml(objectName)}</strong><ul>`;
 
       if (data.fieldDependencies.length > 0) {
         html += `<li><strong>Field Dependencies:</strong> ${data.fieldDependencies.length} field(s)</li>`;
         for (const dep of data.fieldDependencies) {
-          html += `<ul><li>${dep.dependentField} → ${dep.controllingField} (${dep.mappings.length} mappings)</li></ul>`;
+          html += `<ul><li>${escapeHtml(dep.dependentField)} → ${escapeHtml(dep.controllingField)} (${dep.mappings.length} mappings)</li></ul>`;
         }
       }
 
       if (data.recordTypePicklists.length > 0) {
         html += `<li><strong>Record Type Picklists:</strong> ${data.recordTypePicklists.length} record type(s)</li>`;
         for (const rt of data.recordTypePicklists) {
-          html += `<ul><li>${rt.recordType} (${rt.picklistValues.length} picklist(s))</li></ul>`;
+          html += `<ul><li>${escapeHtml(rt.recordType)} (${rt.picklistValues.length} picklist(s))</li></ul>`;
         }
       }
 
@@ -1035,7 +1069,7 @@ async function previewDepsImport() {
 
   } catch (error) {
     console.error('[Popup] Error generating preview:', error);
-    statusEl.textContent = `Error: ${error.message}`;
+    statusEl.textContent = `Error: ${escapeHtml(error.message)}`;
     statusEl.className = 'status-message error';
   }
 }
@@ -1280,12 +1314,18 @@ async function handleUpdateObjectChange(e) {
   const fieldSelect = document.getElementById('updateFieldSelect');
   const previewBtn = document.getElementById('previewChangesBtn');
   const previewArea = document.getElementById('previewArea');
+  const deployBtn = document.getElementById('deployPicklistBtn');
 
   // Reset field selection and preview
   fieldSelect.innerHTML = '<option value="">-- Select Field --</option>';
   fieldSelect.disabled = true;
   previewBtn.disabled = true;
   previewArea.classList.add('hidden');
+
+  // Clear any previous deployment state
+  if (deployBtn) {
+    deployBtn.disabled = true;
+  }
 
   if (!objectName) {
     return;
@@ -1339,10 +1379,29 @@ function handleUpdateFieldChange(e) {
     currentFieldMetadata = null;
   }
 
+  // Clear any previous deployment state
+  const deployBtn = document.getElementById('deployPicklistBtn');
+  if (deployBtn) {
+    deployBtn.disabled = true;
+  }
+
   updatePreviewButtonState();
 }
 
 function handleCSVInput() {
+  // Hide previous preview when CSV changes
+  const previewArea = document.getElementById('previewArea');
+  if (previewArea && !previewArea.classList.contains('hidden')) {
+    previewArea.classList.add('hidden');
+    previewData = null;
+
+    // Disable deploy button until new preview is generated
+    const deployBtn = document.getElementById('deployPicklistBtn');
+    if (deployBtn) {
+      deployBtn.disabled = true;
+    }
+  }
+
   updatePreviewButtonState();
 }
 
@@ -1406,7 +1465,21 @@ async function previewPicklistChanges() {
       throw new Error('No valid values found in CSV');
     }
 
-    // Get current picklist values from Salesforce
+    // BUGFIX: Refresh field metadata from Salesforce to get current state
+    // This prevents using cached/stale data from previous deployments
+    console.log('[Popup] Refreshing field metadata from Salesforce...');
+    const metadata = await SalesforceAPI.getObjectMetadata(selectedUpdateObject);
+    const field = metadata.fields.find(f => f.name === selectedUpdateField);
+
+    if (!field) {
+      throw new Error(`Field ${selectedUpdateField} not found on ${selectedUpdateObject}`);
+    }
+
+    // Update cached metadata with fresh data
+    currentFieldMetadata = field;
+    console.log('[Popup] Field metadata refreshed:', currentFieldMetadata);
+
+    // Get current picklist values from Salesforce (now using fresh metadata)
     const currentValues = currentFieldMetadata.picklistValues || [];
     const currentActiveValues = currentValues.filter(v => v.active).map(v => v.value);
     const allCurrentValues = currentValues.map(v => v.value.toLowerCase());
@@ -1530,11 +1603,7 @@ function renderPreview(container, data) {
   container.innerHTML = html;
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+
 
 async function deployPicklistChanges() {
   const statusEl = document.getElementById('updatePicklistStatus');
@@ -1885,6 +1954,22 @@ function handleOrgCompare() {
   }
 }
 
+function handleDeploymentHistory() {
+  try {
+    console.log('[Popup] Opening Deployment History...');
+
+    const deploymentHistoryUrl = chrome.runtime.getURL('pages/deployment-history/deployment-history.html');
+
+    chrome.tabs.create({ url: deploymentHistoryUrl }, (tab) => {
+      console.log('[Popup] Deployment History opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Deployment History:', error);
+    alert(`Failed to open Deployment History: ${error.message}`);
+  }
+}
+
 function handleExportFields() {
   try {
     console.log('[Popup] Opening Export Fields...');
@@ -1987,14 +2072,14 @@ async function handleCheckShareFiles() {
         contentEl.innerHTML = `
           <div class="status-message warning">
             <strong>Warning:</strong><br>
-            ${result.message || 'No files found to check'}
+            ${escapeHtml(result.message) || 'No files found to check'}
           </div>
         `;
       } else {
         contentEl.innerHTML = `
           <div class="status-message error">
             <strong>Check Failed:</strong><br>
-            ${result.message || 'Unknown error occurred'}
+            ${escapeHtml(result.message) || 'Unknown error occurred'}
           </div>
         `;
       }
@@ -2007,7 +2092,7 @@ async function handleCheckShareFiles() {
     const contentEl = document.getElementById('shareFilesContent');
     contentEl.innerHTML = `
       <div class="status-message error">
-        Error: ${error.message}
+        Error: ${escapeHtml(error.message)}
       </div>
     `;
   }

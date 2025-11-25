@@ -4,6 +4,7 @@
 import ThemeManager from '../background/theme-manager.js';
 import SessionManager from '../background/session-manager.js';
 import PermissionsAPI from '../background/permissions-api.js';
+import { escapeHtml } from '../shared/utils.js';
 
 class PermissionComparisonManager {
   constructor() {
@@ -200,7 +201,7 @@ class PermissionComparisonManager {
     profilesList.innerHTML = this.profiles.map(p => `
       <label>
         <input type="checkbox" value="${p.Id}" data-type="profile">
-        ${this.escapeHtml(p.Name)}
+        ${escapeHtml(p.Name)}
       </label>
     `).join('');
 
@@ -209,7 +210,7 @@ class PermissionComparisonManager {
     permSetsList.innerHTML = this.permissionSets.map(ps => `
       <label>
         <input type="checkbox" value="${ps.Id}" data-type="permset">
-        ${this.escapeHtml(ps.Label || ps.Name)}
+        ${escapeHtml(ps.Label || ps.Name)}
       </label>
     `).join('');
 
@@ -274,7 +275,7 @@ class PermissionComparisonManager {
 
     if (!id) return;
 
-    this.showLoading(`Loading permissions for ${name}...`);
+    this.showLoading(`Loading permissions for ${escapeHtml(name)}...`);
 
     try {
       const permissions = await PermissionsAPI.getAllPermissions(id, type);
@@ -300,7 +301,7 @@ class PermissionComparisonManager {
       console.log('[PermissionComparisonManager] Loaded permissions for', name);
     } catch (error) {
       console.error('[PermissionComparisonManager] Error loading permissions:', error);
-      alert(`Error loading permissions: ${error.message}`);
+      alert(`Error loading permissions: ${escapeHtml(error.message)}`);
     } finally {
       this.hideLoading();
     }
@@ -361,7 +362,7 @@ class PermissionComparisonManager {
         <tbody>
           ${perms.map(p => `
             <tr>
-              <td>${this.escapeHtml(p.SobjectType)}</td>
+              <td>${escapeHtml(p.SobjectType)}</td>
               <td class="${PermissionsAPI.getPermissionClass(p.PermissionsCreate)}">
                 <span class="material-symbols-rounded permission-icon">${PermissionsAPI.getPermissionIcon(p.PermissionsCreate)}</span>
               </td>
@@ -420,8 +421,8 @@ class PermissionComparisonManager {
         <tbody>
           ${perms.map(p => `
             <tr>
-              <td>${this.escapeHtml(p.SobjectType)}</td>
-              <td>${this.escapeHtml(p.Field)}</td>
+              <td>${escapeHtml(p.SobjectType)}</td>
+              <td>${escapeHtml(p.Field)}</td>
               <td class="${PermissionsAPI.getPermissionClass(p.PermissionsRead)}">
                 <span class="material-symbols-rounded permission-icon">${PermissionsAPI.getPermissionIcon(p.PermissionsRead)}</span>
               </td>
@@ -452,7 +453,7 @@ class PermissionComparisonManager {
 
     if (!sourceId || !targetId) return;
 
-    this.showLoading(`Comparing ${sourceName} vs ${targetName}...`);
+    this.showLoading(`Comparing ${escapeHtml(sourceName)} vs ${escapeHtml(targetName)}...`);
 
     try {
       this.comparisonResults = await PermissionsAPI.comparePermissions(
@@ -477,7 +478,7 @@ class PermissionComparisonManager {
       console.log('[PermissionComparisonManager] Comparison complete');
     } catch (error) {
       console.error('[PermissionComparisonManager] Error comparing permissions:', error);
-      alert(`Error comparing permissions: ${error.message}`);
+      alert(`Error comparing permissions: ${escapeHtml(error.message)}`);
     } finally {
       this.hideLoading();
     }
@@ -571,8 +572,8 @@ class PermissionComparisonManager {
           <tr>
             <th>Object</th>
             <th>Status</th>
-            <th class="source-header" colspan="6">${this.escapeHtml(sourceName)}</th>
-            <th class="target-header" colspan="6">${this.escapeHtml(targetName)}</th>
+            <th class="source-header" colspan="6">${escapeHtml(sourceName)}</th>
+            <th class="target-header" colspan="6">${escapeHtml(targetName)}</th>
           </tr>
           <tr>
             <th></th>
@@ -599,7 +600,7 @@ class PermissionComparisonManager {
 
             return `
               <tr class="${statusClass}">
-                <td>${this.escapeHtml(item.objectName)}</td>
+                <td>${escapeHtml(item.objectName)}</td>
                 <td><span class="status-badge ${statusBadgeClass}">${status}</span></td>
                 ${this.renderObjectPermCells(item.source)}
                 ${this.renderObjectPermCells(item.target)}
@@ -622,8 +623,8 @@ class PermissionComparisonManager {
             <th>Object</th>
             <th>Field</th>
             <th>Status</th>
-            <th class="source-header" colspan="2">${this.escapeHtml(sourceName)}</th>
-            <th class="target-header" colspan="2">${this.escapeHtml(targetName)}</th>
+            <th class="source-header" colspan="2">${escapeHtml(sourceName)}</th>
+            <th class="target-header" colspan="2">${escapeHtml(targetName)}</th>
           </tr>
           <tr>
             <th></th>
@@ -643,8 +644,8 @@ class PermissionComparisonManager {
 
             return `
               <tr class="${statusClass}">
-                <td>${this.escapeHtml(item.objectName)}</td>
-                <td>${this.escapeHtml(item.field)}</td>
+                <td>${escapeHtml(item.objectName)}</td>
+                <td>${escapeHtml(item.field)}</td>
                 <td><span class="status-badge ${statusBadgeClass}">${status}</span></td>
                 ${this.renderFieldPermCells(item.source)}
                 ${this.renderFieldPermCells(item.target)}
@@ -739,7 +740,7 @@ class PermissionComparisonManager {
     const permType = document.getElementById('comparisonPermType').value;
     const csv = PermissionsAPI.exportComparisonToCSV(this.comparisonResults, permType);
 
-    const filename = `comparison-${this.comparisonResults.source.name}-vs-${this.comparisonResults.target.name}-${permType}.csv`;
+    const filename = `comparison-${escapeHtml(this.comparisonResults.source.name)}-vs-${escapeHtml(this.comparisonResults.target.name)}-${permType}.csv`;
     this.downloadFile(csv, filename, 'text/csv');
   }
 
@@ -747,7 +748,7 @@ class PermissionComparisonManager {
     const file = event.target.files[0];
     if (!file) return;
 
-    document.getElementById('importFileName').textContent = file.name;
+    document.getElementById('importFileName').textContent = escapeHtml(file.name);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -764,7 +765,7 @@ class PermissionComparisonManager {
         document.getElementById('importPreview').classList.remove('hidden');
       } catch (error) {
         console.error('[PermissionComparisonManager] Error parsing import file:', error);
-        alert(`Error parsing file: ${error.message}`);
+        alert(`Error parsing file: ${escapeHtml(error.message)}`);
       }
     };
 
@@ -779,9 +780,9 @@ class PermissionComparisonManager {
 
     // Render summary
     summaryContent.innerHTML = `
-      <p><strong>File Type:</strong> ${this.importedData.type || 'Unknown'}</p>
+      <p><strong>File Type:</strong> ${escapeHtml(this.importedData.type) || 'Unknown'}</p>
       <p><strong>Rows:</strong> ${this.importedData.rowCount || this.importedData.data?.length || 0}</p>
-      <p><strong>Columns:</strong> ${this.importedData.headers?.join(', ') || 'N/A'}</p>
+      <p><strong>Columns:</strong> ${escapeHtml(this.importedData.headers?.join(', ')) || 'N/A'}</p>
       <p class="import-description"><em>This is a preview only. No changes will be deployed to Salesforce.</em></p>
     `;
 
@@ -794,13 +795,13 @@ class PermissionComparisonManager {
         <table class="permissions-table">
           <thead>
             <tr>
-              ${headers.map(h => `<th>${this.escapeHtml(h)}</th>`).join('')}
+              ${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
             ${rows.map(row => `
               <tr>
-                ${headers.map(h => `<td>${this.escapeHtml(row[h] || '')}</td>`).join('')}
+                ${headers.map(h => `<td>${escapeHtml(row[h] || '')}</td>`).join('')}
               </tr>
             `).join('')}
           </tbody>
@@ -905,12 +906,7 @@ class PermissionComparisonManager {
     document.getElementById('loadingOverlay').classList.add('hidden');
   }
 
-  escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+
 }
 
 // Initialize when DOM is ready

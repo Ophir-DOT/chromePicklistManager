@@ -30,6 +30,11 @@ class HealthCheckAPI {
   static async executeQuery(endpoint, method = 'GET') {
     const session = await SessionManager.getCurrentSession();
 
+    // Check if session is an error object
+    if (session && session.error) {
+      throw new Error(session.message || 'No active Salesforce session');
+    }
+
     if (!session || !session.sessionId) {
       throw new Error('No active Salesforce session. Please refresh the page.');
     }

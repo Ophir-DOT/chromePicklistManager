@@ -169,7 +169,7 @@ class HealthCheckSettings {
       ? 'No validation'
       : check.expectedType === 'zero'
         ? 'Expect 0'
-        : `Expect: ${check.expectedValue}`;
+        : `Expect: ${this.escapeHtml(check.expectedValue)}`;
 
     return `
       <div class="check-item ${check.enabled ? '' : 'disabled'}">
@@ -313,7 +313,7 @@ class HealthCheckSettings {
     const check = this.checks.find(c => c.id === id);
     if (!check) return;
 
-    if (!confirm(`Are you sure you want to delete "${check.title}"?`)) {
+    if (!confirm(`Are you sure you want to delete "${this.escapeHtml(check.title)}"?`)) {
       return;
     }
 
@@ -351,7 +351,7 @@ class HealthCheckSettings {
           if (command.shortcut) {
             // Format the shortcut for display
             const keys = command.shortcut.split('+').map(key => key.trim());
-            displayEl.innerHTML = keys.map(key => `<kbd>${key}</kbd>`).join(' + ');
+            displayEl.innerHTML = keys.map(key => `<kbd>${this.escapeHtml(key)}</kbd>`).join(' + ');
           } else {
             displayEl.innerHTML = '<span class="no-shortcut">Not set</span>';
           }
@@ -489,8 +489,8 @@ class HealthCheckSettings {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
-          Update available: v${result.latestVersion} -
-          <a href="${result.downloadUrl}" target="_blank" style="color: inherit; text-decoration: underline;">Download</a>
+          Update available: v${this.escapeHtml(result.latestVersion)} -
+          <a href="${this.escapeHtml(result.downloadUrl)}" target="_blank" style="color: inherit; text-decoration: underline;">Download</a>
         `;
       } else if (result.updateCheckedAt) {
         const lastChecked = new Date(result.updateCheckedAt);
@@ -500,7 +500,7 @@ class HealthCheckSettings {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
           </svg>
-          Up to date (checked ${timeAgo})
+          Up to date (checked ${this.escapeHtml(timeAgo)})
         `;
       } else {
         statusEl.className = 'update-status';
@@ -611,13 +611,13 @@ class HealthCheckSettings {
         const session = response.data;
 
         // Display instance URL
-        instanceUrlEl.innerHTML = `<a href="${session.instanceUrl}" target="_blank">${session.instanceUrl}</a>`;
+        instanceUrlEl.innerHTML = `<a href="${this.escapeHtml(session.instanceUrl)}" target="_blank">${this.escapeHtml(session.instanceUrl)}</a>`;
 
         // Display session ID (truncated for display, full value for copy)
         const fullSessionId = session.sessionId;
         const truncatedId = fullSessionId.length > 50
-          ? fullSessionId.substring(0, 25) + '...' + fullSessionId.substring(fullSessionId.length - 20)
-          : fullSessionId;
+          ? this.escapeHtml(fullSessionId.substring(0, 25)) + '...' + this.escapeHtml(fullSessionId.substring(fullSessionId.length - 20))
+          : this.escapeHtml(fullSessionId);
 
         sessionIdEl.textContent = truncatedId;
         sessionIdEl.setAttribute('data-full-id', fullSessionId);

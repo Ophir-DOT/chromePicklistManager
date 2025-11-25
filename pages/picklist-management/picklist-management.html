@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Picklist Management - DOT Toolkit</title>
+  <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="../../popup/design-tokens.css">
+  <link rel="stylesheet" href="picklist-management.css">
+  <script src="../../lib/jszip.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="header-content">
+        <h1>
+          <span class="material-symbols-rounded">list_alt</span>
+          Picklist Management
+        </h1>
+        <div class="header-actions">
+          <button id="helpBtn" class="btn btn-icon" title="Help">
+            <span class="material-symbols-rounded">help</span>
+          </button>
+        </div>
+      </div>
+      <div class="org-info">
+        <strong>Org:</strong> <span id="orgUrl">Loading...</span>
+      </div>
+      <p class="header-description">Export and manage picklist values and field dependencies</p>
+    </header>
+
+    <!-- Tab Navigation -->
+    <div class="tabs">
+      <button class="tab-button active" data-tab="export-picklist">
+        <span class="material-symbols-rounded">download</span>
+        Export Picklist
+      </button>
+      <button class="tab-button" data-tab="export-dependency">
+        <span class="material-symbols-rounded">account_tree</span>
+        Export Dependencies
+      </button>
+      <button class="tab-button" data-tab="picklist-loader">
+        <span class="material-symbols-rounded">upload_file</span>
+        Picklist Loader
+      </button>
+      <button class="tab-button locked-feature" data-tab="dependency-loader">
+        <span class="material-symbols-rounded">cloud_upload</span>
+        Dependency Loader
+        <span class="material-symbols-rounded lock-icon">lock</span>
+      </button>
+    </div>
+
+    <!-- Tab Panels -->
+    <div class="tab-content">
+      <!-- Export Picklist Tab -->
+      <div id="export-picklist" class="tab-panel active">
+        <div class="panel-section">
+          <h2>Export Picklist Values</h2>
+          <p class="section-description">Export picklist and multipicklist values from selected objects to CSV format</p>
+
+          <div class="form-group">
+            <label for="exportObjectSearch">Search Objects:</label>
+            <input type="text" id="exportObjectSearch" placeholder="Type to search objects...">
+          </div>
+
+          <div class="form-group">
+            <label>Select Objects (click to toggle):</label>
+            <div id="exportObjectList" class="object-list">
+              <div class="loading-state">
+                <span class="material-symbols-rounded spin">sync</span>
+                <p>Loading objects...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="exportSelectAllBtn" class="btn btn-secondary">Select All</button>
+            <button id="exportClearAllBtn" class="btn btn-secondary">Clear All</button>
+            <button id="exportPicklistBtn" class="btn btn-primary" disabled>
+              <span class="material-symbols-rounded">download</span>
+              Export to CSV
+            </button>
+          </div>
+
+          <div id="exportPicklistStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Export Dependencies Tab -->
+      <div id="export-dependency" class="tab-panel">
+        <div class="panel-section">
+          <h2>Export Field Dependencies</h2>
+          <p class="section-description">Export controlling and dependent field relationships to CSV format</p>
+
+          <div class="form-group">
+            <label for="exportDepsObjectSearch">Search Objects:</label>
+            <input type="text" id="exportDepsObjectSearch" placeholder="Type to search objects...">
+          </div>
+
+          <div class="form-group">
+            <label>Select Objects (click to toggle):</label>
+            <div id="exportDepsObjectList" class="object-list">
+              <div class="loading-state">
+                <span class="material-symbols-rounded spin">sync</span>
+                <p>Loading objects...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="exportDepsSelectAllBtn" class="btn btn-secondary">Select All</button>
+            <button id="exportDepsClearAllBtn" class="btn btn-secondary">Clear All</button>
+            <button id="exportDependencyBtn" class="btn btn-primary" disabled>
+              <span class="material-symbols-rounded">download</span>
+              Export to CSV
+            </button>
+          </div>
+
+          <div id="exportDependencyStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Picklist Loader Tab -->
+      <div id="picklist-loader" class="tab-panel">
+        <div class="panel-section">
+          <h2>Picklist Loader</h2>
+          <p class="section-description">Bulk load picklist values from CSV file. Values will be created (if new) or activated (if inactive).</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="updateObjectSelect">Object:</label>
+              <select id="updateObjectSelect">
+                <option value="">-- Select Object --</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="updateFieldSelect">Picklist Field:</label>
+              <select id="updateFieldSelect" disabled>
+                <option value="">-- Select Field --</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="csvTextarea">CSV Values (one per line):</label>
+            <textarea id="csvTextarea" rows="10" placeholder="Enter picklist values, one per line:
+Value 1
+Value 2
+Value 3
+
+Or paste CSV with header:
+PicklistValue
+Value 1
+Value 2"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="overwriteCheckbox">
+              <span>Overwrite Mode (deactivate values not in CSV)</span>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button id="downloadCurrentBtn" class="btn btn-secondary" disabled>
+              <span class="material-symbols-rounded">download</span>
+              Download Current Values
+            </button>
+            <button id="previewChangesBtn" class="btn btn-secondary" disabled>
+              <span class="material-symbols-rounded">visibility</span>
+              Preview Changes
+            </button>
+          </div>
+
+          <div id="previewArea" class="preview-area hidden">
+            <h3>Preview Changes</h3>
+            <div id="previewContent"></div>
+            <div class="form-actions">
+              <button id="deployPicklistBtn" class="btn btn-primary" disabled>
+                <span class="material-symbols-rounded">rocket_launch</span>
+                Deploy Changes
+              </button>
+            </div>
+          </div>
+
+          <div id="updatePicklistStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Dependency Loader Tab -->
+      <div id="dependency-loader" class="tab-panel">
+        <div class="panel-section">
+          <h2>Dependency Loader 🔒</h2>
+          <p class="section-description">Bulk load field dependencies from CSV file. This feature is password-protected.</p>
+
+          <div id="dependencyUnlockSection" class="unlock-section">
+            <div class="lock-icon-large">
+              <span class="material-symbols-rounded">lock</span>
+            </div>
+            <p>This feature is password-protected. Enter the password to unlock.</p>
+            <div class="form-group">
+              <label for="dependencyPassword">Password:</label>
+              <input type="password" id="dependencyPassword" placeholder="Enter password">
+            </div>
+            <button id="unlockDependencyBtn" class="btn btn-primary">
+              <span class="material-symbols-rounded">lock_open</span>
+              Unlock
+            </button>
+            <div id="unlockStatus" class="status-message"></div>
+          </div>
+
+          <div id="dependencyLoaderContent" class="hidden">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="depsObjectSelect">Object:</label>
+                <select id="depsObjectSelect">
+                  <option value="">-- Select Object --</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="depsDependencySelect">Field Dependency:</label>
+                <select id="depsDependencySelect" disabled>
+                  <option value="">-- Select Dependency --</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="dependencyInfoSection" class="dependency-info hidden">
+              <div class="info-row">
+                <strong>Controlling Field:</strong> <span id="infoControllingField">-</span>
+              </div>
+              <div class="info-row">
+                <strong>Dependent Field:</strong> <span id="infoDependentField">-</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="depsTextarea">Dependency Rules:</label>
+              <div style="margin-bottom: 8px;">
+                <label style="margin-right: 15px;">
+                  <input type="radio" name="depsFormat" value="csv" checked> CSV (comma-separated)
+                </label>
+                <label>
+                  <input type="radio" name="depsFormat" value="excel"> Excel (tab-separated)
+                </label>
+              </div>
+              <textarea id="depsTextarea" rows="10" placeholder="Enter dependencies in CSV format:
+ControllingValue,DependentValue
+Option A,Choice 1
+Option A,Choice 2
+Option B,Choice 3
+
+Or paste from Excel (tab-separated):
+ControllingValue    DependentValue
+Option A            Choice 1"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button id="downloadCurrentDepsBtn" class="btn btn-secondary" disabled>
+                <span class="material-symbols-rounded">download</span>
+                Download Current Dependencies
+              </button>
+              <button id="previewDepsChangesBtn" class="btn btn-secondary" disabled>
+                <span class="material-symbols-rounded">visibility</span>
+                Preview Changes
+              </button>
+            </div>
+
+            <div id="depsPreviewArea" class="preview-area hidden">
+              <h3>Preview Changes</h3>
+              <div id="depsPreviewContent"></div>
+              <div class="form-actions">
+                <button id="showDebugInfoBtn" class="btn btn-secondary">
+                  <span class="material-symbols-rounded">bug_report</span>
+                  Show Request Details
+                </button>
+                <button id="deployDependencyBtn" class="btn btn-primary" disabled>
+                  <span class="material-symbols-rounded">rocket_launch</span>
+                  Deploy Changes
+                </button>
+              </div>
+              <div id="debugInfoArea" class="hidden" style="margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;">
+                <h4 style="margin-top: 0;">Request Details</h4>
+                <div style="margin-bottom: 10px;">
+                  <strong>URL:</strong>
+                  <div id="debugUrl" style="word-break: break-all; color: #0066cc;"></div>
+                </div>
+                <div>
+                  <strong>Request Body:</strong>
+                  <pre id="debugBody" style="background: white; padding: 10px; border-radius: 4px; overflow-x: auto;"></pre>
+                </div>
+              </div>
+            </div>
+
+            <div id="dependencyLoaderStatus" class="status-message"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="picklist-management.js"></script>
+</body>
+</html>
