@@ -1,5 +1,6 @@
 import SessionManager from './session-manager.js';
 import MetadataAPI from './metadata-api.js';
+import ToolingAPI from './tooling-api.js';
 import StorageManager from './storage-manager.js';
 import SalesforceAPI from './api-client.js';
 import UpdateChecker from './update-checker.js';
@@ -125,6 +126,17 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, data: status });
         break;
 
+      case 'UPDATE_FIELD_DEPENDENCIES':
+        const updateResult = await updateFieldDependencies(
+          request.objectName,
+          request.dependentField,
+          request.controllingField,
+          request.mappings,
+          request.fieldMetadata
+        );
+        sendResponse({ success: true, data: updateResult });
+        break;
+
       case 'COMPARE_ORGS':
         const comparison = await compareOrgs(request.source, request.target);
         sendResponse({ success: true, data: comparison });
@@ -245,6 +257,129 @@ async function checkDeployStatus(deployId) {
   const session = await SessionManager.getCurrentSession();
   const status = await MetadataAPI.checkDeployStatus(session, deployId);
   return status;
+}
+
+async function updateFieldDependencies(objectName, dependentField, controllingField, mappings, fieldMetadata) {
+  const session = await SessionManager.getCurrentSession();
+
+  // Step 1: Validate all values exist
+  const validation = await ToolingAPI.validateDependencyValues(
+    session,
+    objectName,
+    controllingField,
+    dependentField,
+    mappings
+  );
+
+  if (!validation.valid) {
+    const errors = [];
+    if (validation.missingControlling.length > 0) {
+      errors.push(`Missing controlling field values: ${validation.missingControlling.join(', ')}`);
+    }
+    if (validation.missingDependent.length > 0) {
+      errors.push(`Missing dependent field values: ${validation.missingDependent.join(', ')}`);
+    }
+    throw new Error(errors.join('\n'));
+  }
+
+  // Step 2: Get CustomField ID for the dependent field
+  const fieldId = await ToolingAPI.getCustomFieldId(session, objectName, dependentField);
+
+  // Step 3: Get CURRENT field metadata to preserve existing settings
+  console.log('[ServiceWorker] Fetching current field metadata...');
+  const currentMetadata = await ToolingAPI.getCustomFieldMetadata(session, fieldId);
+  console.log('[ServiceWorker] Current metadata valueSet:', currentMetadata.Metadata.valueSet);
+
+  // Ensure valueSet exists
+  if (!currentMetadata.Metadata.valueSet) {
+    throw new Error('Field metadata does not contain valueSet. This field may not be a picklist or may not have dependencies configured.');
+  }
+
+  // Step 4: Merge new valueSettings with existing ones (append-only)
+  const existingValueSettings = currentMetadata.Metadata.valueSet.valueSettings || [];
+  const newValueSettings = fieldMetadata.valueSettings;
+
+  if (!Array.isArray(newValueSettings)) {
+    throw new Error('fieldMetadata.valueSettings must be an array');
+  }
+
+  // Create a map of existing mappings (valueName -> controllingFieldValues)
+  const existingMap = new Map();
+  existingValueSettings.forEach(vs => {
+    if (vs && vs.valueName && Array.isArray(vs.controllingFieldValue)) {
+      existingMap.set(vs.valueName, vs.controllingFieldValue);
+    }
+  });
+
+  // Merge: Update existing or add new
+  newValueSettings.forEach(vs => {
+    if (!vs || !vs.valueName || !Array.isArray(vs.controllingFieldValue)) {
+      console.warn('[ServiceWorker] Skipping invalid valueSetting:', vs);
+      return;
+    }
+
+    if (existingMap.has(vs.valueName)) {
+      // Merge controlling field values
+      const existingValues = new Set(existingMap.get(vs.valueName));
+      vs.controllingFieldValue.forEach(v => existingValues.add(v));
+      existingMap.set(vs.valueName, Array.from(existingValues));
+    } else {
+      // New mapping
+      existingMap.set(vs.valueName, vs.controllingFieldValue);
+    }
+  });
+
+  // Convert back to array
+  const mergedValueSettings = Array.from(existingMap.entries()).map(([valueName, controllingFieldValue]) => ({
+    valueName,
+    controllingFieldValue
+  }));
+
+  console.log('[ServiceWorker] Merged value settings count:', mergedValueSettings.length);
+
+  // Step 5: Build complete dependency metadata matching working format exactly
+  // Only include: label, type, valueSet, visibleLines, writeRequiresMasterRead
+  // Do NOT include: required, trackFeedHistory, trackHistory, trackTrending
+  const dependencyMetadata = {
+    label: currentMetadata.Metadata.label,
+    type: 'Picklist',
+    valueSet: {
+      controllingField: currentMetadata.Metadata.valueSet.controllingField,
+      restricted: currentMetadata.Metadata.valueSet.restricted !== undefined ? currentMetadata.Metadata.valueSet.restricted : true,
+      valueSetDefinition: currentMetadata.Metadata.valueSet.valueSetDefinition || null,
+      valueSetName: currentMetadata.Metadata.valueSet.valueSetName || null,
+      valueSettings: mergedValueSettings
+    },
+    visibleLines: currentMetadata.Metadata.visibleLines || null,
+    writeRequiresMasterRead: currentMetadata.Metadata.writeRequiresMasterRead || null
+  };
+
+  const fullName = `${objectName}.${dependentField}`;
+
+  // Log the request details for debugging
+  const patchUrl = `${session.instanceUrl}/services/data/v59.0/tooling/sobjects/CustomField/${fieldId}`;
+  const patchBody = {
+    Metadata: dependencyMetadata,
+    FullName: fullName
+  };
+
+  console.log('[ServiceWorker] PATCH URL:', patchUrl);
+  console.log('[ServiceWorker] PATCH Body:', JSON.stringify(patchBody, null, 2));
+
+  // Step 6: Update via Tooling API PATCH
+  const result = await ToolingAPI.updateFieldDependencies(
+    session,
+    fieldId,
+    dependencyMetadata,
+    fullName
+  );
+
+  return {
+    success: true,
+    fieldId: fieldId,
+    instanceUrl: session.instanceUrl,
+    message: 'Dependencies updated successfully'
+  };
 }
 
 async function compareOrgs(sourceData, targetData) {

@@ -113,7 +113,7 @@ async function checkConnection() {
  */
 function disableAllFeatures(reason) {
   const featureButtons = [
-    'exportBtn', 'exportDepsBtn', 'picklistLoaderBtn', 'dependencyLoaderBtn',
+    'picklistManagementBtn',
     'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
     'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
     'deploymentHistoryBtn', 'exportFieldsBtn'
@@ -136,7 +136,7 @@ function disableAllFeatures(reason) {
  */
 function enableAllFeatures() {
   const featureButtons = [
-    'exportBtn', 'exportDepsBtn', 'picklistLoaderBtn', 'dependencyLoaderBtn',
+    'picklistManagementBtn',
     'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
     'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
     'deploymentHistoryBtn', 'exportFieldsBtn'
@@ -156,10 +156,7 @@ function enableAllFeatures() {
 
 function setupEventListeners() {
   // Main menu buttons
-  document.getElementById('exportBtn').addEventListener('click', showExportView);
-  document.getElementById('exportDepsBtn').addEventListener('click', showExportDepsView);
-  document.getElementById('picklistLoaderBtn').addEventListener('click', showPicklistLoader);
-  document.getElementById('dependencyLoaderBtn').addEventListener('click', showDependencyLoader);
+  document.getElementById('picklistManagementBtn').addEventListener('click', handlePicklistManagement);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
   document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
   document.getElementById('batchJobMonitorBtn').addEventListener('click', handleBatchJobMonitor);
@@ -170,64 +167,42 @@ function setupEventListeners() {
   document.getElementById('exportFieldsBtn').addEventListener('click', handleExportFields);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
 
-  // Export view buttons
-  document.getElementById('backBtn').addEventListener('click', showMainView);
-  document.getElementById('selectAllBtn').addEventListener('click', selectAllObjects);
-  document.getElementById('clearBtn').addEventListener('click', clearSelection);
-  document.getElementById('doExportBtn').addEventListener('click', doExport);
-  document.getElementById('objectSearch').addEventListener('input', handleSearch);
-
-  // Export Dependencies view buttons
-  document.getElementById('backFromDepsBtn').addEventListener('click', showMainView);
-  document.getElementById('doExportDepsBtn').addEventListener('click', doExportDeps);
-  document.getElementById('depsObjectSearch').addEventListener('input', handleDepsSearch);
-
-  // Dependency Loader view buttons
-  document.getElementById('backFromDependencyLoaderBtn').addEventListener('click', showMainView);
-  document.getElementById('depsFileInput').addEventListener('change', handleDepsFileUpload);
-  document.getElementById('importDepsBtn').addEventListener('click', previewDepsImport);
-  document.getElementById('deployDepsBtn').addEventListener('click', deployDepsImport);
-
-  // Update Picklist view buttons
-  document.getElementById('backFromUpdateBtn').addEventListener('click', showMainView);
-  document.getElementById('updateObjectSelect').addEventListener('change', handleUpdateObjectChange);
-  document.getElementById('updateFieldSelect').addEventListener('change', handleUpdateFieldChange);
-  document.getElementById('csvTextarea').addEventListener('input', handleCSVInput);
-  document.getElementById('previewChangesBtn').addEventListener('click', previewPicklistChanges);
-  document.getElementById('deployPicklistBtn').addEventListener('click', deployPicklistChanges);
-
   // Share Files view buttons
   document.getElementById('backFromShareFilesBtn').addEventListener('click', showMainView);
 }
 
+//Handler for new unified Picklist Management page
+function handlePicklistManagement() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL('pages/picklist-management/picklist-management.html')
+  });
+}
+
+// ============================================
+// DEPRECATED: OLD PICKLIST MANAGEMENT FUNCTIONS
+// These functions have been migrated to pages/picklist-management/
+// Keeping them here temporarily for reference/rollback if needed
+// TODO: Remove in future version after stable release
+// ============================================
+
 async function showExportView() {
+  // DEPRECATED: This function is no longer used
+  // Picklist Management is now a full-page tool
+  console.warn('[Popup] showExportView is deprecated - use Picklist Management button instead');
+  return;
+
+  /* Original code kept for reference
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('exportView').classList.remove('hidden');
 
   // Load objects
   await loadObjects();
+  */
 }
 
 function showMainView() {
-  document.getElementById('exportView').classList.add('hidden');
-  document.getElementById('exportDepsView').classList.add('hidden');
-  document.getElementById('dependencyLoaderView').classList.add('hidden');
-  document.getElementById('updatePicklistView').classList.add('hidden');
   document.getElementById('shareFilesView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
-
-  // Reset state
-  selectedObjects.clear();
-  allObjects = [];
-  filteredObjects = [];
-
-  // Reset dependencies state
-  selectedDepsObject = null;
-  allDepsObjects = [];
-  filteredDepsObjects = [];
-
-  // Reset update picklist state
-  resetUpdatePicklistView();
 }
 
 async function loadObjects() {
@@ -1339,12 +1314,18 @@ async function handleUpdateObjectChange(e) {
   const fieldSelect = document.getElementById('updateFieldSelect');
   const previewBtn = document.getElementById('previewChangesBtn');
   const previewArea = document.getElementById('previewArea');
+  const deployBtn = document.getElementById('deployPicklistBtn');
 
   // Reset field selection and preview
   fieldSelect.innerHTML = '<option value="">-- Select Field --</option>';
   fieldSelect.disabled = true;
   previewBtn.disabled = true;
   previewArea.classList.add('hidden');
+
+  // Clear any previous deployment state
+  if (deployBtn) {
+    deployBtn.disabled = true;
+  }
 
   if (!objectName) {
     return;
@@ -1398,10 +1379,29 @@ function handleUpdateFieldChange(e) {
     currentFieldMetadata = null;
   }
 
+  // Clear any previous deployment state
+  const deployBtn = document.getElementById('deployPicklistBtn');
+  if (deployBtn) {
+    deployBtn.disabled = true;
+  }
+
   updatePreviewButtonState();
 }
 
 function handleCSVInput() {
+  // Hide previous preview when CSV changes
+  const previewArea = document.getElementById('previewArea');
+  if (previewArea && !previewArea.classList.contains('hidden')) {
+    previewArea.classList.add('hidden');
+    previewData = null;
+
+    // Disable deploy button until new preview is generated
+    const deployBtn = document.getElementById('deployPicklistBtn');
+    if (deployBtn) {
+      deployBtn.disabled = true;
+    }
+  }
+
   updatePreviewButtonState();
 }
 
@@ -1465,7 +1465,21 @@ async function previewPicklistChanges() {
       throw new Error('No valid values found in CSV');
     }
 
-    // Get current picklist values from Salesforce
+    // BUGFIX: Refresh field metadata from Salesforce to get current state
+    // This prevents using cached/stale data from previous deployments
+    console.log('[Popup] Refreshing field metadata from Salesforce...');
+    const metadata = await SalesforceAPI.getObjectMetadata(selectedUpdateObject);
+    const field = metadata.fields.find(f => f.name === selectedUpdateField);
+
+    if (!field) {
+      throw new Error(`Field ${selectedUpdateField} not found on ${selectedUpdateObject}`);
+    }
+
+    // Update cached metadata with fresh data
+    currentFieldMetadata = field;
+    console.log('[Popup] Field metadata refreshed:', currentFieldMetadata);
+
+    // Get current picklist values from Salesforce (now using fresh metadata)
     const currentValues = currentFieldMetadata.picklistValues || [];
     const currentActiveValues = currentValues.filter(v => v.active).map(v => v.value);
     const allCurrentValues = currentValues.map(v => v.value.toLowerCase());
