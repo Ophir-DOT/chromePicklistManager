@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DOT Toolkit",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Comprehensive toolkit for Salesforce: manage picklists, dependencies, health checks, advanced admin tools, and security features",
 
   "permissions": [
