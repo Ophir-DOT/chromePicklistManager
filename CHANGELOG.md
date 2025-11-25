@@ -5,6 +5,185 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2025-11-25
+
+### Focus: UI Improvements, Org Compare Enhancements, Deployment Tracking & Picklist Consolidation
+
+### Added
+
+- **Deployment History Log**: Comprehensive audit trail for all metadata changes
+  - Track all deployments with timestamp, org details, metadata type, and change details
+  - Statistics dashboard showing total deployments, success/failure rates, and recent activity (last 7 days)
+  - Advanced filtering by metadata type, action (create/update/delete), status, and date range
+  - Search by component name, object, or org
+  - Two view modes: List view (sortable table) and Timeline view (chronological by date)
+  - Deployment details modal with before/after JSON diff
+  - Export history to CSV or JSON
+  - Delete individual records or clear all history with confirmation
+  - Automatic retention policy (last 1000 deployments or 6 months)
+  - Full dark mode support
+  - Added "Deployment History" button in Advanced Tools section
+  - Added `background/deployment-history-api.js` module with 8 methods
+  - Added `pages/deployment-history/` directory with HTML, CSS, JS files
+
+- **Picklist Management Consolidation**: Unified full-page tool for all picklist operations
+  - Consolidated 4 separate picklist tools into single "Picklist Management" page
+  - Tabbed interface with 4 sections:
+    - Export Picklist - Export picklist values to CSV
+    - Export Dependency - Export field dependencies to CSV
+    - Picklist Loader - Bulk load picklist values from CSV with preview
+    - Dependency Loader 🔒 - Bulk load dependencies (password: DOT-DEPS-2024)
+  - Opens in full-page tab (like other advanced tools)
+  - Cleaner popup UI (4 buttons consolidated into 1)
+  - Password protection maintained for Dependency Loader
+  - All functionality preserved and enhanced
+  - Full dark mode support using design tokens
+  - Material Design icons throughout
+  - Responsive design for different screen sizes
+  - Added `pages/picklist-management/` directory with HTML, CSS, JS files
+
+- **Org Compare - Collapsible View**: Improved organization and readability
+  - Click to expand/collapse individual metadata type sections
+  - "Expand All" / "Collapse All" buttons for bulk control
+  - Persist user's collapsed state across sessions in localStorage
+  - Smooth CSS transitions for better UX (0.3s ease-out)
+  - Icon indicators showing expanded/collapsed state (expand_more/expand_less)
+  - Material Design icons with color-coded indicators
+
+- **Org Compare - XML View**: Raw metadata inspection similar to Gearset
+  - Toggle between Comparison View and XML View with button controls
+  - Side-by-side XML display (source org | target org)
+  - Custom syntax highlighting for XML elements (no external dependencies)
+  - Copy XML to clipboard with visual feedback
+  - Download XML as .xml file with org name
+  - Pretty-printed XML with proper indentation
+  - Monospace font for code readability
+  - Lazy loading - XML loads on first view switch
+  - Color-coded syntax:
+    - Tags: Blue (#0066cc / #61afef dark)
+    - Brackets: Gray (#666 / #abb2bf dark)
+    - Attributes: Red (#d73a49 / #e06c75 dark)
+    - Values: Dark blue (#032f62 / #98c379 dark)
+  - Full dark mode support with One Dark theme colors
+  - Added `getMetadataAsXml()` and `getMetadataTypeAsXml()` methods to `background/org-compare-api.js`
+
+- **Org Compare - Field Dependency Value Comparison**: Detailed dependency mapping analysis
+  - Compare actual controlling and dependent picklist values, not just existence
+  - Decode Salesforce validFor base64 bitfield to extract value mappings
+  - Detect differences in dependency configurations:
+    - Controlling values that exist in one org but not the other
+    - Dependent values that exist in one org but not the other
+    - Different mappings (same controlling value maps to different dependent values)
+  - Visual representation of dependency value mappings
+  - Expandable view showing full value mappings (integrated into item details)
+  - Status indicators for each value difference:
+    - Source Only: Blue indicator for values enabled in source but not target
+    - Target Only: Green indicator for values enabled in target but not source
+    - Count display: Shows number of dependent values per controlling value
+  - Added 4 new methods to `background/org-compare-api.js`:
+    - `decodeDependencyMappings()` - Extract controlling → dependent value mappings
+    - `isDependentValueValidFor()` - Decode Salesforce validFor bitfield
+    - `compareDependencies()` - Detailed dependency comparison
+    - `compareValueMappings()` - Find differences in value mappings
+  - Added value mapping section styles with color-coded borders
+  - Full dark mode support
+
+- **Utility Functions**: Enhanced security and data handling
+  - Added `shared/utils.js` with HTML and SOQL escaping utilities
+  - `escapeHtml()` - Prevent XSS attacks in user-generated content
+  - `escapeSoql()` - Prevent SOQL injection in dynamic queries
+  - Reusable across all extension components
+
+### Fixed
+
+- **CRITICAL: Org/Session Detection and Isolation**
+  - Fixed extension confusing orgs when multiple Salesforce tabs are open
+  - Fixed wrong org data displayed or mixed data between orgs
+  - Added support for setup domain (`*.salesforce-setup.com`) detection
+  - Implemented tab-based session isolation with URL validation
+  - Added non-Salesforce tab handling: Shows "Not Connected" and disables all features
+  - Added strict org validation before every API call
+  - Session detection now uses current tab URL for org identification
+  - Clear visual indicator showing which org is currently active
+  - Error message if org mismatch detected during operation
+  - Updated `background/session-manager.js` with rewritten `getCurrentSession()` method
+  - Updated `background/service-worker.js` with salesforce-setup.com detection
+  - Updated `manifest.json` with salesforce-setup.com content script matching
+  - Updated `popup/app.js` with feature locking and clear error messages
+
+- **Dark Theme in Health Check Report**: Fixed incomplete dark mode styling
+  - Replaced incomplete dark mode styles with comprehensive dark theme support
+  - Fixed header gradient, tile backgrounds, progress section, and field colors
+  - Added dark mode styles for buttons, skeleton loaders, and storage displays
+  - All colors now properly reference design tokens from `design-tokens.css`
+  - UI style consistency with Org Compare Tool
+
+- **Floating Headers in Permission Compare Table**: Fixed z-index layering
+  - Added `z-index: var(--z-sticky)` to `.permissions-table th` and `.comparison-table th`
+  - Headers now properly stay above scrolling table content in both light and dark modes
+  - Updated dark mode styles to ensure headers stay solid
+
+- **Validation Rule Count Discrepancy**: Fixed inconsistent counts
+  - Fixed issue where summary showed different count than filtered results
+  - Increased default limit from 200 to 2000 in `background/validation-rule-api.js`
+  - Summary count now matches number of items shown when filtered
+  - All validation rules for an object are displayed (up to 2000)
+  - No silent truncation of results due to pagination/limits
+
+- **Picklist Loader Cache Bug**: Fixed stale metadata issue
+  - Fixed issue where preview compared new CSV against OLD cached metadata instead of current Salesforce state
+  - Fetch fresh field metadata from Salesforce every time "Preview Changes" is clicked
+  - Clear state on object, field, or CSV changes to force re-preview
+  - Disabled deploy button when field selection changes
+  - Preview always compares against current Salesforce state
+  - Multiple deployments in same session now work correctly
+  - Both overwrite mode and append mode work correctly
+  - Updated `popup/app.js` with metadata refresh in `previewPicklistChanges()`
+
+- **API Error Handling**: Improved error response format handling
+  - Updated `background/api-client.js` to handle new error response format from SessionManager
+  - Better error propagation and user-facing error messages
+
+### Changed
+
+- **Popup Menu Simplification**: Consolidated picklist tools
+  - Replaced 4 individual picklist buttons with single "Picklist Management" button
+  - Cleaner popup UI with more space for other tools
+  - Consistent with other full-page tools (Health Check, Org Compare, Deployment History, etc.)
+  - Better organization of related functionality
+  - Removed old view HTML (exportView, exportDepsView, updatePicklistView, dependencyLoaderView)
+  - Deprecated old event listeners and functions (marked for future removal)
+
+### Technical Notes
+
+- **Session Isolation**: Tab-based validation ensures strict org isolation and prevents data mixing
+- **Bitfield Decoding**: Salesforce validFor base64 bitfield decoded using LSB (Least Significant Bit) ordering
+- **XML Generation**: Package.xml format following Salesforce Metadata API structure
+- **Storage Strategy**: Deployment history uses chrome.storage.local with retention policy (1000 records or 6 months)
+- **API Version**: All REST and Tooling API calls use v59.0
+- **CSS Architecture**: Design tokens for consistent theming, z-index layering for sticky headers
+- **Progressive Enhancement**: Collapsible sections load with saved state from localStorage
+- **Security**: HTML and SOQL escaping utilities prevent XSS and injection attacks
+
+### Performance Considerations
+
+- **Lazy Loading**: XML view loads only when first accessed
+- **Retention Policy**: Automatic cleanup keeps deployment history under 1000 records
+- **State Persistence**: Collapsed sections saved in localStorage to preserve user preferences
+- **Validation Rule Limit**: Increased to 2000 to cover most orgs without pagination issues
+
+### Migration Notes
+
+- **Popup UI**: Users will see 1 consolidated "Picklist Management" button instead of 4 separate buttons
+- **Functionality**: All picklist features preserved, now accessible via tabs in full-page tool
+- **Password Protection**: Dependency Loader still requires unlock key (DOT-DEPS-2024)
+
+### Documentation
+
+- Updated `.v1.7-progress.md` with complete implementation details for all 6 phases (63% complete)
+- All features include comprehensive inline JSDoc comments
+- Technical implementation notes in progress file
+
 ## [1.6.0] - 2025-11-21
 
 ### Focus: Enhanced Comparisons, Monitoring & Field Analytics
