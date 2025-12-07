@@ -678,7 +678,6 @@ function setupPicklistLoaderListeners() {
   document.getElementById('updateObjectSelect')?.addEventListener('change', handleUpdateObjectChange);
   document.getElementById('updateFieldSelect')?.addEventListener('change', handleUpdateFieldChange);
   document.getElementById('csvTextarea')?.addEventListener('input', handleCSVInput);
-  document.getElementById('overwriteCheckbox')?.addEventListener('change', handleOverwriteChange);
   document.getElementById('downloadCurrentBtn')?.addEventListener('click', downloadCurrentValues);
   document.getElementById('previewChangesBtn')?.addEventListener('click', previewPicklistChanges);
   document.getElementById('deployPicklistBtn')?.addEventListener('click', deployPicklistChanges);
@@ -802,18 +801,6 @@ function handleCSVInput() {
   updatePreviewButtonState();
 }
 
-function handleOverwriteChange() {
-  // Hide preview when overwrite mode changes
-  const previewArea = document.getElementById('previewArea');
-  if (previewArea && !previewArea.classList.contains('hidden')) {
-    previewArea.classList.add('hidden');
-    previewData = null;
-
-    const deployBtn = document.getElementById('deployPicklistBtn');
-    if (deployBtn) deployBtn.disabled = true;
-  }
-}
-
 function updatePreviewButtonState() {
   const csvText = document.getElementById('csvTextarea').value.trim();
   const previewBtn = document.getElementById('previewChangesBtn');
@@ -824,15 +811,25 @@ async function downloadCurrentValues() {
   if (!currentFieldMetadata) return;
 
   try {
-    const rows = [['PicklistValue']];
+    // New format: Label,API Name
+    const rows = [['Label', 'API Name']];
     const values = currentFieldMetadata.picklistValues || [];
     const activeValues = values.filter(v => v.active);
 
     activeValues.forEach(value => {
-      rows.push([value.label]);
+      rows.push([value.label, value.value]);
     });
 
-    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const csvContent = rows.map(row =>
+      row.map(cell => {
+        const cellStr = String(cell || '');
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return '"' + cellStr.replace(/"/g, '""') + '"';
+        }
+        return cellStr;
+      }).join(',')
+    ).join('\n');
+
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -842,7 +839,7 @@ async function downloadCurrentValues() {
     a.click();
     URL.revokeObjectURL(url);
 
-    console.log('[Picklist Management] Current values downloaded');
+    console.log('[Picklist Management] Current values downloaded (Label,API Name format)');
   } catch (error) {
     console.error('[Picklist Management] Error downloading current values:', error);
   }
@@ -851,28 +848,86 @@ async function downloadCurrentValues() {
 function parseCSV(csvText) {
   const lines = csvText.split('\n').map(line => line.trim()).filter(line => line);
 
+  if (lines.length === 0) {
+    return [];
+  }
+
   const firstLine = lines[0] || '';
-  const startIndex = firstLine.toLowerCase().includes('picklistvalue') ? 1 : 0;
+  // Check if header row exists (contains "Label" or "API")
+  const hasHeader = firstLine.toLowerCase().includes('label') || firstLine.toLowerCase().includes('api');
+  const startIndex = hasHeader ? 1 : 0;
 
-  const values = lines.slice(startIndex).map(line => {
-    let value = line.trim();
-    if (value.startsWith('"') && value.endsWith('"')) {
-      value = value.slice(1, -1).replace(/""/g, '"');
-    }
-    return value;
-  }).filter(v => v);
-
-  const unique = [];
+  const values = [];
   const seen = new Set();
-  for (const value of values) {
-    const lower = value.toLowerCase();
-    if (!seen.has(lower)) {
-      seen.add(lower);
-      unique.push(value);
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Parse CSV line with proper handling of quoted values
+    const parts = parseCSVLine(line);
+
+    if (parts.length < 2) {
+      console.warn('[Picklist Management] Skipping invalid CSV line (expected 2 columns):', line);
+      continue;
+    }
+
+    const label = parts[0].trim();
+    const apiName = parts[1].trim();
+
+    if (!label || !apiName) {
+      console.warn('[Picklist Management] Skipping line with empty values:', line);
+      continue;
+    }
+
+    // Check for duplicates based on API Name (case-insensitive)
+    const apiNameLower = apiName.toLowerCase();
+    if (seen.has(apiNameLower)) {
+      console.warn('[Picklist Management] Skipping duplicate API Name:', apiName);
+      continue;
+    }
+
+    seen.add(apiNameLower);
+    values.push({
+      label: label,
+      fullName: apiName
+    });
+  }
+
+  console.log('[Picklist Management] Parsed', values.length, 'values from CSV');
+  return values;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // End of field
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
     }
   }
 
-  return unique;
+  // Add last field
+  result.push(current);
+
+  return result;
 }
 
 async function previewPicklistChanges() {
@@ -907,47 +962,38 @@ async function previewPicklistChanges() {
 
     const currentValues = currentFieldMetadata.picklistValues || [];
     const currentActiveValues = currentValues.filter(v => v.active).map(v => v.value);
-    const allCurrentValues = currentValues.map(v => v.value.toLowerCase());
 
-    const toCreate = [];
-    const toActivate = [];
-    const toDeactivate = [];
-    const alreadyActive = [];
-
-    const overwrite = document.getElementById('overwriteCheckbox').checked;
-
-    csvValues.forEach(value => {
-      const valueLower = value.toLowerCase();
-      const existingIndex = allCurrentValues.indexOf(valueLower);
-
-      if (existingIndex === -1) {
-        toCreate.push(value);
-      } else {
-        const existingValue = currentValues[existingIndex];
-        if (!existingValue.active) {
-          toActivate.push(existingValue.value);
-        } else {
-          alreadyActive.push(existingValue.value);
-        }
-      }
+    // Build map of current values by API Name (case-insensitive)
+    const currentValuesMap = new Map();
+    currentValues.forEach(v => {
+      currentValuesMap.set(v.value.toLowerCase(), v);
     });
 
-    if (overwrite) {
-      const csvValuesLower = csvValues.map(v => v.toLowerCase());
-      currentActiveValues.forEach(value => {
-        if (!csvValuesLower.includes(value.toLowerCase())) {
-          toDeactivate.push(value);
-        }
-      });
-    }
+    const toCreate = [];
+    const alreadyActive = [];
+
+    // csvValues now contains objects with {label, fullName}
+    csvValues.forEach(csvValue => {
+      const apiNameLower = csvValue.fullName.toLowerCase();
+      const existing = currentValuesMap.get(apiNameLower);
+
+      if (!existing) {
+        // New value - will be created
+        toCreate.push(csvValue);
+      } else {
+        // Value exists - add to alreadyActive (Tooling API will handle it)
+        alreadyActive.push({
+          label: csvValue.label,
+          fullName: csvValue.fullName,
+          currentLabel: existing.label
+        });
+      }
+    });
 
     previewData = {
       csvValues,
       toCreate,
-      toActivate,
-      toDeactivate,
-      alreadyActive,
-      overwrite
+      alreadyActive
     };
 
     renderPreview(previewContent, previewData);
@@ -972,35 +1018,31 @@ async function previewPicklistChanges() {
 function renderPreview(container, data) {
   let html = '';
 
+  // Info message about Tooling API append mode
+  html += `<div class="info-message" style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+    <strong>ℹ️ Append Mode:</strong> New values will be added to the picklist. Existing values will be updated with new labels if different.
+  </div>`;
+
   if (data.toCreate.length > 0) {
     html += `
       <div class="preview-section create">
         <h4>✓ Create New Values <span class="preview-count">(${data.toCreate.length})</span></h4>
-        <div class="preview-values">
-          ${data.toCreate.map(v => `<span class="preview-value">${escapeHtml(v)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  if (data.toActivate.length > 0) {
-    html += `
-      <div class="preview-section activate">
-        <h4>↑ Activate Existing Values <span class="preview-count">(${data.toActivate.length})</span></h4>
-        <div class="preview-values">
-          ${data.toActivate.map(v => `<span class="preview-value">${escapeHtml(v)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  if (data.toDeactivate.length > 0) {
-    html += `
-      <div class="preview-section deactivate">
-        <h4>↓ Deactivate Values <span class="preview-count">(${data.toDeactivate.length})</span></h4>
-        <div class="preview-values">
-          ${data.toDeactivate.map(v => `<span class="preview-value">${escapeHtml(v)}</span>`).join('')}
-        </div>
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>API Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.toCreate.map(v => `
+              <tr>
+                <td>${escapeHtml(v.label)}</td>
+                <td>${escapeHtml(v.fullName)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
@@ -1008,13 +1050,41 @@ function renderPreview(container, data) {
   if (data.alreadyActive.length > 0) {
     html += `
       <div class="preview-section keep">
-        <h4>= Already Active <span class="preview-count">(${data.alreadyActive.length})</span></h4>
-        <div class="preview-values">
-          ${data.alreadyActive.slice(0, 10).map(v => `<span class="preview-value">${escapeHtml(v)}</span>`).join('')}
-          ${data.alreadyActive.length > 10 ? `<span class="preview-value">... and ${data.alreadyActive.length - 10} more</span>` : ''}
-        </div>
+        <h4>= Existing Values <span class="preview-count">(${data.alreadyActive.length})</span></h4>
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>Label (CSV)</th>
+              <th>API Name</th>
+              <th>Current Label</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.alreadyActive.slice(0, 10).map(v => `
+              <tr>
+                <td>${escapeHtml(v.label)}</td>
+                <td>${escapeHtml(v.fullName)}</td>
+                <td style="color: ${v.label !== v.currentLabel ? '#ff9800' : 'inherit'}">
+                  ${escapeHtml(v.currentLabel)}
+                  ${v.label !== v.currentLabel ? ' <span style="font-size: 0.9em;">(will update)</span>' : ''}
+                </td>
+              </tr>
+            `).join('')}
+            ${data.alreadyActive.length > 10 ? `
+              <tr>
+                <td colspan="3" style="text-align: center; color: var(--brand-color-text-muted);">
+                  ... and ${data.alreadyActive.length - 10} more
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
       </div>
     `;
+  }
+
+  if (data.toCreate.length === 0 && data.alreadyActive.length === 0) {
+    html += `<p style="text-align: center; color: var(--brand-color-text-muted);">No changes detected</p>`;
   }
 
   container.innerHTML = html;
@@ -1026,146 +1096,52 @@ async function deployPicklistChanges() {
 
   try {
     deployBtn.disabled = true;
-    statusEl.textContent = 'Building deployment package...';
+    statusEl.textContent = 'Updating picklist via Tooling API...';
     statusEl.className = 'status-message loading';
 
-    console.log('[Picklist Management] Starting Metadata API deployment for', selectedUpdateObject, selectedUpdateField);
+    console.log('[Picklist Management] Starting Tooling API update for', selectedUpdateObject, selectedUpdateField);
 
-    const session = await SessionManager.getCurrentSession();
+    // Build values array from CSV data (Label + API Name format)
+    const valuesToUpdate = previewData.csvValues.map(csvValue => ({
+      fullName: csvValue.fullName,
+      label: csvValue.label,
+      default: null // Always null as per requirements
+    }));
 
-    const valuesToDeploy = [];
-    const currentValues = currentFieldMetadata.picklistValues || [];
-    const csvValuesLower = previewData.csvValues.map(v => v.toLowerCase());
+    console.log('[Picklist Management] Values to update:', valuesToUpdate);
 
-    if (previewData.overwrite) {
-      previewData.csvValues.forEach(csvValue => {
-        const csvLower = csvValue.toLowerCase();
-        const existing = currentValues.find(v => v.value.toLowerCase() === csvLower);
+    // Call service worker to handle Tooling API update
+    const response = await chrome.runtime.sendMessage({
+      action: 'UPDATE_PICKLIST_VALUES',
+      objectName: selectedUpdateObject,
+      fieldName: selectedUpdateField,
+      values: valuesToUpdate,
+      overwrite: false // Always append mode with Tooling API
+    });
 
-        if (existing) {
-          valuesToDeploy.push({
-            fullName: existing.value,
-            label: existing.label || existing.value,
-            default: existing.defaultValue || false
-          });
-        } else {
-          valuesToDeploy.push({
-            fullName: csvValue,
-            label: csvValue,
-            default: false
-          });
-        }
-      });
-    } else {
-      currentValues.forEach(existing => {
-        if (existing.active) {
-          valuesToDeploy.push({
-            fullName: existing.value,
-            label: existing.label || existing.value,
-            default: existing.defaultValue || false
-          });
-        }
-      });
-
-      previewData.toCreate.forEach(newValue => {
-        valuesToDeploy.push({
-          fullName: newValue,
-          label: newValue,
-          default: false
-        });
-      });
-
-      previewData.toActivate.forEach(valueToActivate => {
-        const existing = currentValues.find(v => v.value.toLowerCase() === valueToActivate.toLowerCase());
-        if (existing) {
-          valuesToDeploy.push({
-            fullName: existing.value,
-            label: existing.label || existing.value,
-            default: existing.defaultValue || false
-          });
-        }
-      });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update picklist values');
     }
 
-    const metadataChanges = {
-      [selectedUpdateObject]: {
-        [selectedUpdateField]: {
-          label: currentFieldMetadata.label,
-          type: currentFieldMetadata.type === 'multipicklist' ? 'MultiselectPicklist' : 'Picklist',
-          restricted: true,
-          values: valuesToDeploy
-        }
-      }
-    };
+    console.log('[Picklist Management] Update successful:', response.data);
 
-    statusEl.textContent = 'Generating deployment package...';
-    const zipBlob = await MetadataAPI.buildDeployPackageBlob(metadataChanges);
-
-    const timestamp = Date.now();
-    const zipFilename = `metadata-deploy-${selectedUpdateObject}-${selectedUpdateField}-${timestamp}.zip`;
-    downloadZipFile(zipBlob, zipFilename);
-
-    statusEl.textContent = '✓ Package downloaded! Review the ZIP file, then confirm deployment.';
+    statusEl.textContent = `✓ Picklist updated successfully! ${valuesToUpdate.length} values processed.`;
     statusEl.className = 'status-message success';
 
-    const confirmDeploy = confirm(
-      'Deployment package has been downloaded.\n\n' +
-      'Please review the ZIP file contents.\n\n' +
-      'Click OK to deploy to Salesforce, or Cancel to abort.'
-    );
-
-    if (!confirmDeploy) {
-      statusEl.textContent = 'Deployment cancelled. You can review the downloaded package.';
-      statusEl.className = 'status-message';
-      deployBtn.disabled = false;
-      return;
-    }
-
-    statusEl.textContent = 'Deploying to Salesforce...';
-    statusEl.className = 'status-message loading';
-
-    const deployId = await MetadataAPI.deploy(session, metadataChanges);
-    console.log('[Picklist Management] Deployment started:', deployId);
-
-    statusEl.textContent = `Deployment in progress (ID: ${deployId})...`;
-
-    let attempts = 0;
-    const maxAttempts = 30;
-
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const status = await MetadataAPI.checkDeployStatus(session, deployId);
-      console.log('[Picklist Management] Deployment status:', status);
-
-      if (status.done) {
-        if (status.success) {
-          statusEl.textContent = '✓ Deployment successful!';
-          statusEl.className = 'status-message success';
-
-          setTimeout(() => {
-            resetPicklistLoader();
-          }, 3000);
-          return;
-        } else {
-          throw new Error(status.errorMessage || 'Deployment failed');
-        }
-      }
-
-      attempts++;
-      statusEl.textContent = `Deploying... (${status.numberComponentsDeployed || 0}/${status.numberComponentsTotal || 0} components)`;
-    }
-
-    throw new Error('Deployment timeout - please check Salesforce deployment status');
+    setTimeout(() => {
+      resetPicklistLoader();
+    }, 3000);
 
   } catch (error) {
-    console.error('[Picklist Management] Deployment failed:', error);
+    console.error('[Picklist Management] Update failed:', error);
 
     let errorMessage = error.message;
-    if (errorMessage.includes('Session expired')) {
+    if (errorMessage.includes('Session expired') || errorMessage.includes('INVALID_SESSION_ID')) {
       errorMessage = 'Session expired. Please refresh the Salesforce page and try again.';
-    } else if (errorMessage.includes('timeout')) {
-      errorMessage = 'Deployment is taking longer than expected. Check Salesforce setup for deployment status.';
+    } else if (errorMessage.includes('INVALID_TYPE')) {
+      errorMessage = 'This field cannot be updated via Tooling API. It may be a standard field or use a StandardValueSet.';
+    } else if (errorMessage.includes('Cannot deserialize')) {
+      errorMessage = 'Invalid data format. Please check your CSV values.';
     }
 
     statusEl.textContent = `Error: ${errorMessage}`;

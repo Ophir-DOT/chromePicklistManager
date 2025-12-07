@@ -1361,3 +1361,44 @@ footer {
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: var(--brand-color-primary);
 }
+
+/* ============================================
+   APPROVAL PROCESS STATUS BADGES
+   ============================================ */
+
+.status-approved {
+  background: #d4edda !important;
+  color: #155724 !important;
+  border: 1px solid #c3e6cb !important;
+}
+
+.status-pending {
+  background: #fff3cd !important;
+  color: #856404 !important;
+  border: 1px solid #ffeaa7 !important;
+}
+
+.status-rejected {
+  background: #f8d7da !important;
+  color: #721c24 !important;
+  border: 1px solid #f5c6cb !important;
+}
+
+/* Dark mode status badges */
+[data-theme="dark"] .status-approved {
+  background: rgba(40, 167, 69, 0.2) !important;
+  color: #4caf50 !important;
+  border-color: rgba(40, 167, 69, 0.4) !important;
+}
+
+[data-theme="dark"] .status-pending {
+  background: rgba(255, 193, 7, 0.2) !important;
+  color: #ffc107 !important;
+  border-color: rgba(255, 193, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .status-rejected {
+  background: rgba(220, 53, 69, 0.2) !important;
+  color: #f44336 !important;
+  border-color: rgba(220, 53, 69, 0.4) !important;
+}

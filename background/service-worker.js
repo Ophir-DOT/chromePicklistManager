@@ -137,6 +137,16 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, data: updateResult });
         break;
 
+      case 'UPDATE_PICKLIST_VALUES':
+        const picklistUpdateResult = await updatePicklistValues(
+          request.objectName,
+          request.fieldName,
+          request.values,
+          request.overwrite
+        );
+        sendResponse({ success: true, data: picklistUpdateResult });
+        break;
+
       case 'COMPARE_ORGS':
         const comparison = await compareOrgs(request.source, request.target);
         sendResponse({ success: true, data: comparison });
@@ -172,6 +182,11 @@ async function handleMessage(request, sender, sendResponse) {
           request.recordId
         );
         sendResponse({ success: true, data: addLinksResult });
+        break;
+
+      case 'CHECK_APPROVAL_PROCESS':
+        const approvalProcessResult = await checkApprovalProcess(request.recordId, request.tabId, request.url);
+        sendResponse({ success: true, data: approvalProcessResult });
         break;
 
       // Deployment History
@@ -382,6 +397,35 @@ async function updateFieldDependencies(objectName, dependentField, controllingFi
   };
 }
 
+async function updatePicklistValues(objectName, fieldName, values, overwrite) {
+  const session = await SessionManager.getCurrentSession();
+
+  console.log('[ServiceWorker] Updating picklist values via Tooling API:', {
+    objectName,
+    fieldName,
+    valueCount: values.length,
+    overwrite
+  });
+
+  // Use ToolingAPI.updatePicklist method which handles all the logic
+  const result = await ToolingAPI.updatePicklist(
+    session,
+    objectName,
+    fieldName,
+    values,
+    overwrite
+  );
+
+  console.log('[ServiceWorker] Picklist update result:', result);
+
+  return {
+    success: true,
+    fieldId: result.fieldId,
+    valuesUpdated: result.valuesUpdated,
+    message: `Successfully updated ${result.valuesUpdated} picklist values`
+  };
+}
+
 async function compareOrgs(sourceData, targetData) {
   // Simple comparison logic
   const differences = {};
@@ -414,6 +458,85 @@ async function getObjects() {
     } else {
       throw error;
     }
+  }
+}
+
+async function checkApprovalProcess(recordId, tabId, url) {
+  try {
+    console.log('[checkApprovalProcess] Checking approval processes for record:', recordId);
+
+    // Get session from tab context if provided, otherwise use stored session
+    let session;
+    if (tabId || url) {
+      try {
+        let tab;
+        if (tabId) {
+          tab = await chrome.tabs.get(tabId);
+        } else if (url) {
+          tab = { url: url };
+        }
+        session = await SessionManager.extractSession(tab);
+      } catch (error) {
+        console.warn('[checkApprovalProcess] Failed to extract session from tab, using stored session:', error.message);
+        session = await SessionManager.getCurrentSession();
+      }
+    } else {
+      session = await SessionManager.getCurrentSession();
+    }
+
+    if (!session || !session.sessionId) {
+      throw new Error('No active Salesforce session found. Please open a Salesforce page first.');
+    }
+
+    // Build SOQL query
+    const soql = `SELECT Id, Name, CompSuite__Status__c, CompSuite__Approval_Process_Init__c, CompSuite__Approval_Process_Init__r.Name, CreatedDate FROM CompSuite__Approval_Process__c WHERE CompSuite__Full_Object_Id__c = '${recordId}' ORDER BY CreatedDate DESC`;
+
+    console.log('[checkApprovalProcess] Executing SOQL:', soql);
+
+    // Execute query via REST API
+    const queryUrl = `${session.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(soql)}`;
+
+    const response = await fetch(queryUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.sessionId}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[checkApprovalProcess] Query failed:', response.status, errorText);
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the Salesforce page and try again.');
+      } else if (response.status === 400) {
+        // Check if error is due to missing object
+        if (errorText.includes('sObject type') && errorText.includes('is not supported')) {
+          throw new Error('CompSuite__Approval_Process__c object not found. This org may not have CompSuite installed.');
+        }
+        throw new Error(`Query error: ${errorText}`);
+      } else {
+        throw new Error(`Failed to query approval processes: ${response.status} ${response.statusText}`);
+      }
+    }
+
+    const result = await response.json();
+
+    console.log('[checkApprovalProcess] Query result:', {
+      totalSize: result.totalSize,
+      records: result.records?.length || 0
+    });
+
+    return {
+      records: result.records || [],
+      totalSize: result.totalSize || 0,
+      session: session
+    };
+
+  } catch (error) {
+    console.error('[checkApprovalProcess] Error:', error);
+    throw error;
   }
 }
 

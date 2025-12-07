@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkConnection();
   await checkForUpdates();
   await updateCheckShareFilesButton();
+  await updateCheckApprovalProcessButton();
   setupEventListeners();
 });
 
@@ -114,7 +115,7 @@ async function checkConnection() {
 function disableAllFeatures(reason) {
   const featureButtons = [
     'picklistManagementBtn',
-    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'checkApprovalProcessBtn', 'batchJobMonitorBtn',
     'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
     'deploymentHistoryBtn', 'exportFieldsBtn'
   ];
@@ -137,7 +138,7 @@ function disableAllFeatures(reason) {
 function enableAllFeatures() {
   const featureButtons = [
     'picklistManagementBtn',
-    'healthCheckBtn', 'checkShareFilesBtn', 'batchJobMonitorBtn',
+    'healthCheckBtn', 'checkShareFilesBtn', 'checkApprovalProcessBtn', 'batchJobMonitorBtn',
     'validationRulesBtn', 'permissionComparisonBtn', 'orgCompareBtn',
     'deploymentHistoryBtn', 'exportFieldsBtn'
   ];
@@ -159,6 +160,7 @@ function setupEventListeners() {
   document.getElementById('picklistManagementBtn').addEventListener('click', handlePicklistManagement);
   document.getElementById('healthCheckBtn').addEventListener('click', handleHealthCheck);
   document.getElementById('checkShareFilesBtn').addEventListener('click', handleCheckShareFiles);
+  document.getElementById('checkApprovalProcessBtn').addEventListener('click', handleCheckApprovalProcess);
   document.getElementById('batchJobMonitorBtn').addEventListener('click', handleBatchJobMonitor);
   document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
   document.getElementById('permissionComparisonBtn').addEventListener('click', handlePermissionComparison);
@@ -169,6 +171,9 @@ function setupEventListeners() {
 
   // Share Files view buttons
   document.getElementById('backFromShareFilesBtn').addEventListener('click', showMainView);
+
+  // Approval Process view buttons
+  document.getElementById('backFromApprovalProcessBtn').addEventListener('click', showMainView);
 }
 
 //Handler for new unified Picklist Management page
@@ -202,6 +207,7 @@ async function showExportView() {
 
 function showMainView() {
   document.getElementById('shareFilesView').classList.add('hidden');
+  document.getElementById('approvalProcessView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
 }
 
@@ -2320,6 +2326,223 @@ function buildShareFilesTable(data, orgUrl) {
   html += '</div>';
 
   return html;
+}
+
+function buildApprovalProcessTable(data, orgUrl, pageContext) {
+  if (!data || !data.records || data.records.length === 0) {
+    return '<div class="no-shares-message">No approval processes found</div>';
+  }
+
+  let html = `
+    <div class="share-files-info">
+      <h3>Approval Processes for Record</h3>
+      <div class="info-row">
+        <span><strong>Record ID:</strong></span>
+        <span>${escapeHtml(pageContext.recordId)}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>Object:</strong></span>
+        <span>${escapeHtml(pageContext.objectName || 'Unknown')}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>Total Processes:</strong></span>
+        <span>${data.records.length}</span>
+      </div>
+    </div>
+  `;
+
+  html += '<div class="share-files-table">';
+
+  // Build a section for each approval process (similar to file sections)
+  data.records.forEach(process => {
+    // Status badge
+    const status = (process.CompSuite__Status__c || 'N/A').toLowerCase();
+    let statusClass = '';
+    if (status.includes('approved')) {
+      statusClass = 'status-approved';
+    } else if (status.includes('pending') || status.includes('submitted')) {
+      statusClass = 'status-pending';
+    } else if (status.includes('rejected')) {
+      statusClass = 'status-rejected';
+    }
+
+    // Format date
+    let formattedDate = 'N/A';
+    if (process.CreatedDate) {
+      try {
+        const date = new Date(process.CreatedDate);
+        formattedDate = date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (error) {
+        formattedDate = process.CreatedDate;
+      }
+    }
+
+    html += `
+      <div class="file-section">
+        <div class="file-header">
+          <span>${escapeHtml(process.Name || 'Untitled')}</span>
+          <span class="share-type-badge ${statusClass}">${escapeHtml(process.CompSuite__Status__c || 'N/A')}</span>
+        </div>
+        <div class="file-info">
+          <strong>Created:</strong> ${escapeHtml(formattedDate)} |
+          <strong>Process ID:</strong> ${escapeHtml(process.Id)}
+        </div>
+    `;
+
+    // Build details table
+    html += `
+        <table class="shares-table">
+          <thead>
+            <tr>
+              <th style="width: 30%">Field</th>
+              <th style="width: 70%">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    // Process record link
+    const processUrl = orgUrl ? `${orgUrl}/${process.Id}` : '#';
+    const processLink = orgUrl
+      ? `<a href="${processUrl}" target="_blank" class="entity-link">${escapeHtml(process.Id)}</a>`
+      : escapeHtml(process.Id);
+
+    html += `
+            <tr>
+              <td><strong>Process Record</strong></td>
+              <td>${processLink}</td>
+            </tr>
+    `;
+
+    // Approval Process Init
+    if (process.CompSuite__Approval_Process_Init__r && process.CompSuite__Approval_Process_Init__r.Name) {
+      const initUrl = orgUrl ? `${orgUrl}/${process.CompSuite__Approval_Process_Init__c}` : '#';
+      const initLink = orgUrl
+        ? `<a href="${initUrl}" target="_blank" class="entity-link">${escapeHtml(process.CompSuite__Approval_Process_Init__r.Name)}</a>`
+        : escapeHtml(process.CompSuite__Approval_Process_Init__r.Name);
+
+      html += `
+            <tr>
+              <td><strong>Approval Process Init</strong></td>
+              <td>${initLink}</td>
+            </tr>
+      `;
+    }
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  return html;
+}
+
+async function updateCheckApprovalProcessButton() {
+  const button = document.getElementById('checkApprovalProcessBtn');
+
+  try {
+    // Get current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.id) {
+      button.disabled = true;
+      return;
+    }
+
+    // Ask content script for current page context
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'GET_CURRENT_OBJECT' });
+
+    const pageContext = response?.context;
+
+    console.log('[Popup] Current page context for approval process:', pageContext);
+
+    // Enable button only if on a record page (any object)
+    if (pageContext && pageContext.isRecordPage && pageContext.recordId) {
+      button.disabled = false;
+      button.title = `Check approval processes for this ${pageContext.objectName || 'record'}`;
+    } else {
+      button.disabled = true;
+      button.title = 'Available only on record pages';
+    }
+
+  } catch (error) {
+    console.log('[Popup] Could not get current object context:', error.message);
+    button.disabled = true;
+  }
+}
+
+async function handleCheckApprovalProcess() {
+  try {
+    if (!currentPageContext || !currentPageContext.recordId) {
+      alert('Error: No record context available');
+      return;
+    }
+
+    // Navigate to approval process view
+    document.getElementById('mainView').classList.add('hidden');
+    document.getElementById('approvalProcessView').classList.remove('hidden');
+
+    const contentEl = document.getElementById('approvalProcessContent');
+    contentEl.innerHTML = '<div class="loading-message">Loading approval processes...</div>';
+
+    console.log('[Popup] Checking approval processes for record:', currentPageContext.recordId);
+
+    // Get current session for org URL
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const sessionResponse = await chrome.runtime.sendMessage({
+      action: 'GET_SESSION',
+      tabId: tab.id,
+      url: tab.url
+    });
+
+    const orgUrl = sessionResponse.success ? sessionResponse.data.instanceUrl : '';
+
+    // Send message to background to run the check
+    const response = await chrome.runtime.sendMessage({
+      action: 'CHECK_APPROVAL_PROCESS',
+      recordId: currentPageContext.recordId,
+      tabId: tab.id,
+      url: tab.url
+    });
+
+    if (response.success) {
+      const result = response.data;
+
+      // Display results
+      if (result.records && result.records.length > 0) {
+        contentEl.innerHTML = buildApprovalProcessTable(result, orgUrl, currentPageContext);
+        console.log('[Popup] Approval process check results:', result);
+      } else {
+        contentEl.innerHTML = `
+          <div class="status-message warning">
+            <strong>No Approval Processes Found</strong><br>
+            No approval processes found for this record.
+          </div>
+        `;
+      }
+    } else {
+      throw new Error(response.error || 'Unknown error');
+    }
+
+  } catch (error) {
+    console.error('[Popup] Check approval process error:', error);
+    const contentEl = document.getElementById('approvalProcessContent');
+    contentEl.innerHTML = `
+      <div class="status-message error">
+        Error: ${escapeHtml(error.message)}
+      </div>
+    `;
+  }
 }
 
 function generateHealthCheckReport(results) {

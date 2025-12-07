@@ -91,6 +91,11 @@
             Check Share Files
           </button>
 
+          <button id="checkApprovalProcessBtn" class="action-button" disabled title="Check approval processes for the current record">
+            <span class="material-symbols-rounded icon">approval</span>
+            Check Approval Process
+          </button>
+
           <button id="settingsBtn" class="action-button">
             <span class="material-symbols-rounded icon">settings</span>
             Settings
@@ -116,6 +121,20 @@
         <div class="export-content">
           <div id="shareFilesContent">
             <div class="loading-message">Loading share information...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approval Process View -->
+      <div id="approvalProcessView" class="hidden">
+        <div class="view-header">
+          <button id="backFromApprovalProcessBtn" class="back-button">← Back</button>
+          <h2>Approval Process Details</h2>
+        </div>
+
+        <div class="export-content">
+          <div id="approvalProcessContent">
+            <div class="loading-message">Loading approval processes...</div>
           </div>
         </div>
       </div>
