@@ -135,26 +135,50 @@ class ToolingAPI {
    * @param {object} fieldInfo - Field metadata {label, type}
    * @returns {Promise<object>} PATCH response
    */
-  static async updatePicklistValues(session, fieldId, values, fieldInfo) {
-    // Build request body matching Python JSON structure (lines 141-151 in picklist_loader.py)
+  static async updatePicklistValues(session, fieldId, values, fieldInfo, fullName, existingMetadata) {
+    // Build request body matching the working Salesforce format
+    // Include ALL required fields from existing metadata to avoid overwriting them
     const body = {
       Metadata: {
         label: fieldInfo.label,
         type: fieldInfo.type,
         valueSet: {
+          controllingField: existingMetadata?.controllingField || null,
+          restricted: existingMetadata?.restricted || null,
           valueSetDefinition: {
+            sorted: existingMetadata?.valueSetDefinition?.sorted || false,
             value: values.map(v => ({
+              color: null,
+              default: v.default || false,
+              description: null,
+              isActive: null,
               label: v.label,
-              valueName: v.valueName, // Tooling API uses 'valueName' not 'fullName'
-              default: v.default || false
+              urls: null,
+              valueName: v.valueName
             }))
-          }
-        }
-      }
+          },
+          valueSetName: existingMetadata?.valueSetName || null,
+          valueSettings: existingMetadata?.valueSettings || []
+        },
+        visibleLines: existingMetadata?.visibleLines || null,
+        writeRequiresMasterRead: existingMetadata?.writeRequiresMasterRead || null
+      },
+      FullName: fullName
     };
 
     // PATCH the CustomField
     const endpoint = `/services/data/v59.0/tooling/sobjects/CustomField/${fieldId}`;
+    const fullUrl = `${session.instanceUrl}${endpoint}`;
+
+    // DEBUG: Log PATCH request details
+    console.log('[ToolingAPI] ========== PATCH REQUEST DEBUG ==========');
+    console.log('[ToolingAPI] Method: PATCH');
+    console.log('[ToolingAPI] URL:', fullUrl);
+    console.log('[ToolingAPI] Field ID:', fieldId);
+    console.log('[ToolingAPI] Request Body:', JSON.stringify(body, null, 2));
+    console.log('[ToolingAPI] Values Count:', values.length);
+    console.log('[ToolingAPI] Field Info:', fieldInfo);
+    console.log('[ToolingAPI] ==========================================');
 
     try {
       const response = await SalesforceAPI.callAPI(endpoint, {
@@ -162,9 +186,15 @@ class ToolingAPI {
         body: body
       });
 
+      console.log('[ToolingAPI] PATCH successful. Response:', response);
       return response;
     } catch (error) {
       console.error('[ToolingAPI] PATCH failed:', error);
+      console.error('[ToolingAPI] Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
 
       // Provide helpful error messages
       if (error.message.includes('Cannot deserialize')) {
@@ -189,34 +219,53 @@ class ToolingAPI {
    */
   static async updatePicklist(session, objectName, fieldName, newValues, overwrite = false) {
     try {
+      console.log('[ToolingAPI] Starting updatePicklist workflow...');
+
       // Step 1: Get CustomField ID
+      console.log('[ToolingAPI] Step 1: Getting CustomField ID...');
       const fieldId = await this.getCustomFieldId(session, objectName, fieldName);
+      console.log('[ToolingAPI] Field ID:', fieldId);
 
       // Step 2: Get current field metadata
+      console.log('[ToolingAPI] Step 2: Getting field metadata...');
       const fieldMetadata = await this.getCustomFieldMetadata(session, fieldId);
       const fieldInfo = {
         label: fieldMetadata.Metadata.label,
         type: fieldMetadata.Metadata.type
       };
+      console.log('[ToolingAPI] Field Info:', fieldInfo);
 
-      // Step 3: Get current picklist values
-      const currentPicklistValues = await this.getPicklistValues(session, objectName, fieldName);
+      // Extract FullName and existing valueSet metadata
+      const fullName = fieldMetadata.FullName || `${objectName}.${fieldName}`;
+      const existingValueSet = fieldMetadata.Metadata.valueSet || {};
+
+      // Step 3: Get current picklist values from metadata (not PicklistValueInfo)
+      console.log('[ToolingAPI] Step 3: Getting current values from field metadata...');
+      const currentPicklistValues = existingValueSet.valueSetDefinition?.value || [];
+      console.log('[ToolingAPI] Current values count:', currentPicklistValues.length);
+      console.log('[ToolingAPI] Existing valueSet metadata:', {
+        controllingField: existingValueSet.controllingField,
+        restricted: existingValueSet.restricted,
+        valueSetName: existingValueSet.valueSetName,
+        valueSettingsCount: existingValueSet.valueSettings?.length || 0
+      });
 
       // Step 4: Build final values array
-      // Convert newValues format to match what we need
+      console.log('[ToolingAPI] Step 4: Building values array...');
       const valuesToUpdate = [];
       const newValuesMap = new Map(newValues.map(v => [v.fullName.toLowerCase(), v]));
 
-      // If not overwrite mode, include all existing active values
+      // If not overwrite mode, include all existing values
       if (!overwrite) {
+        console.log('[ToolingAPI] Append mode: including existing values');
         currentPicklistValues.forEach(current => {
-          const key = current.Value.toLowerCase();
+          const key = (current.valueName || current.fullName).toLowerCase();
           if (!newValuesMap.has(key)) {
             // Keep existing value
             valuesToUpdate.push({
-              label: current.Label,
-              valueName: current.Value,
-              default: current.IsDefaultValue
+              label: current.label,
+              valueName: current.valueName || current.fullName,
+              default: current.default || false
             });
           }
         });
@@ -231,8 +280,18 @@ class ToolingAPI {
         });
       });
 
+      console.log('[ToolingAPI] Total values to update:', valuesToUpdate.length);
+
       // Step 5: PATCH the field
-      const result = await this.updatePicklistValues(session, fieldId, valuesToUpdate, fieldInfo);
+      console.log('[ToolingAPI] Step 5: Executing PATCH...');
+      const result = await this.updatePicklistValues(
+        session,
+        fieldId,
+        valuesToUpdate,
+        fieldInfo,
+        fullName,
+        existingValueSet
+      );
 
       return {
         success: true,

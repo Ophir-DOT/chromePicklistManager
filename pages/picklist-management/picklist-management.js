@@ -852,7 +852,31 @@ function parseCSV(csvText) {
     return [];
   }
 
+  // Auto-detect format: Check first line for tabs (Excel) vs commas (CSV)
   const firstLine = lines[0] || '';
+  const hasTabs = firstLine.includes('\t');
+  const hasCommas = firstLine.includes(',');
+
+  let separator = ','; // Default to CSV
+  let formatName = 'CSV';
+
+  if (hasTabs && !hasCommas) {
+    // Excel format (tab-separated, no commas)
+    separator = '\t';
+    formatName = 'Excel/TSV';
+  } else if (hasTabs && hasCommas) {
+    // Both tabs and commas - count which is more frequent to decide
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+
+    if (tabCount >= commaCount) {
+      separator = '\t';
+      formatName = 'Excel/TSV';
+    }
+  }
+
+  console.log(`[Picklist Management] Auto-detected format: ${formatName}`);
+
   // Check if header row exists (contains "Label" or "API")
   const hasHeader = firstLine.toLowerCase().includes('label') || firstLine.toLowerCase().includes('api');
   const startIndex = hasHeader ? 1 : 0;
@@ -863,11 +887,11 @@ function parseCSV(csvText) {
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i];
 
-    // Parse CSV line with proper handling of quoted values
-    const parts = parseCSVLine(line);
+    // Parse line based on detected separator
+    const parts = parseCSVLine(line, separator);
 
     if (parts.length < 2) {
-      console.warn('[Picklist Management] Skipping invalid CSV line (expected 2 columns):', line);
+      console.warn('[Picklist Management] Skipping invalid line (expected 2 columns):', line);
       continue;
     }
 
@@ -893,15 +917,16 @@ function parseCSV(csvText) {
     });
   }
 
-  console.log('[Picklist Management] Parsed', values.length, 'values from CSV');
+  console.log(`[Picklist Management] Parsed ${values.length} values from ${formatName}`);
   return values;
 }
 
-function parseCSVLine(line) {
+function parseCSVLine(line, separator = ',') {
   const result = [];
   let current = '';
   let inQuotes = false;
 
+  // For tab-separated (Excel), quotes are less common but still supported
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     const nextChar = line[i + 1];
@@ -915,7 +940,7 @@ function parseCSVLine(line) {
         // Toggle quote state
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === separator && !inQuotes) {
       // End of field
       result.push(current);
       current = '';

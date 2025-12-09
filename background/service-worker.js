@@ -30,6 +30,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleMessage(request, sender, sendResponse) {
+  // DEBUG: Log all incoming messages
+  console.log('[ServiceWorker] ========== INCOMING MESSAGE ==========');
+  console.log('[ServiceWorker] Action:', request.action);
+  console.log('[ServiceWorker] Request:', request);
+  console.log('[ServiceWorker] Sender:', sender);
+  console.log('[ServiceWorker] =======================================');
+
   try {
     switch (request.action) {
       case 'GET_SESSION':
@@ -228,7 +235,9 @@ async function handleMessage(request, sender, sendResponse) {
         break;
 
       default:
-        sendResponse({ success: false, error: 'Unknown action' });
+        console.error('[ServiceWorker] Unknown action received:', request.action);
+        console.error('[ServiceWorker] Full request:', request);
+        sendResponse({ success: false, error: `Unknown action: ${request.action}` });
     }
   } catch (error) {
     console.error('Error handling message:', error);
@@ -400,30 +409,40 @@ async function updateFieldDependencies(objectName, dependentField, controllingFi
 async function updatePicklistValues(objectName, fieldName, values, overwrite) {
   const session = await SessionManager.getCurrentSession();
 
-  console.log('[ServiceWorker] Updating picklist values via Tooling API:', {
-    objectName,
-    fieldName,
-    valueCount: values.length,
-    overwrite
+  console.log('[ServiceWorker] ========== UPDATE PICKLIST VALUES ==========');
+  console.log('[ServiceWorker] Object Name:', objectName);
+  console.log('[ServiceWorker] Field Name:', fieldName);
+  console.log('[ServiceWorker] Values Count:', values.length);
+  console.log('[ServiceWorker] Overwrite:', overwrite);
+  console.log('[ServiceWorker] Sample Values:', values.slice(0, 3));
+  console.log('[ServiceWorker] Session:', {
+    instanceUrl: session.instanceUrl,
+    hasSessionId: !!session.sessionId
   });
+  console.log('[ServiceWorker] ================================================');
 
-  // Use ToolingAPI.updatePicklist method which handles all the logic
-  const result = await ToolingAPI.updatePicklist(
-    session,
-    objectName,
-    fieldName,
-    values,
-    overwrite
-  );
+  try {
+    // Use ToolingAPI.updatePicklist method which handles all the logic
+    const result = await ToolingAPI.updatePicklist(
+      session,
+      objectName,
+      fieldName,
+      values,
+      overwrite
+    );
 
-  console.log('[ServiceWorker] Picklist update result:', result);
+    console.log('[ServiceWorker] Picklist update successful:', result);
 
-  return {
-    success: true,
-    fieldId: result.fieldId,
-    valuesUpdated: result.valuesUpdated,
-    message: `Successfully updated ${result.valuesUpdated} picklist values`
-  };
+    return {
+      success: true,
+      fieldId: result.fieldId,
+      valuesUpdated: result.valuesUpdated,
+      message: `Successfully updated ${result.valuesUpdated} picklist values`
+    };
+  } catch (error) {
+    console.error('[ServiceWorker] Update picklist values failed:', error);
+    throw error;
+  }
 }
 
 async function compareOrgs(sourceData, targetData) {
