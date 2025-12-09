@@ -565,12 +565,30 @@ async function doExportDependency() {
 function extractDependencies(metadata) {
   const dependencies = [];
 
+  // Build a map of field API names to their picklist values (API name -> label)
+  const fieldPicklistMap = new Map();
+
+  metadata.fields.forEach(field => {
+    if (field.valueSet?.valueSetDefinition?.value) {
+      const picklistValues = new Map();
+      field.valueSet.valueSetDefinition.value.forEach(v => {
+        picklistValues.set(v.fullName, v.label || v.fullName);
+      });
+      fieldPicklistMap.set(field.fullName, picklistValues);
+    }
+  });
+
   metadata.fields
     .filter(f => f.valueSet?.controllingField)
     .forEach(field => {
+      const controllingPicklistMap = fieldPicklistMap.get(field.valueSet.controllingField) || new Map();
+      const dependentPicklistMap = fieldPicklistMap.get(field.fullName) || new Map();
+
       const mappings = field.valueSet.valueSettings.map(vs => ({
-        controllingValue: vs.controllingFieldValue,
-        dependentValue: vs.valueName
+        controllingValueApi: vs.controllingFieldValue,
+        controllingValueLabel: controllingPicklistMap.get(vs.controllingFieldValue) || vs.controllingFieldValue,
+        dependentValueApi: vs.valueName,
+        dependentValueLabel: dependentPicklistMap.get(vs.valueName) || vs.valueName
       }));
 
       dependencies.push({
@@ -584,19 +602,38 @@ function extractDependencies(metadata) {
 }
 
 function extractRecordTypePicklists(metadata) {
+  // Build a map of field API names to their picklist values (API name -> label)
+  const fieldPicklistMap = new Map();
+
+  metadata.fields.forEach(field => {
+    if (field.valueSet?.valueSetDefinition?.value) {
+      const picklistValues = new Map();
+      field.valueSet.valueSetDefinition.value.forEach(v => {
+        picklistValues.set(v.fullName, v.label || v.fullName);
+      });
+      fieldPicklistMap.set(field.fullName, picklistValues);
+    }
+  });
+
   return metadata.recordTypes.map(rt => ({
     recordType: rt.fullName,
     label: rt.label,
-    picklistValues: rt.picklistValues.map(pv => ({
-      picklist: pv.picklist,
-      values: pv.values.map(v => v.fullName)
-    }))
+    picklistValues: rt.picklistValues.map(pv => {
+      const picklistMap = fieldPicklistMap.get(pv.picklist) || new Map();
+      return {
+        picklist: pv.picklist,
+        values: pv.values.map(v => ({
+          fullName: v.fullName,
+          label: picklistMap.get(v.fullName) || v.fullName
+        }))
+      };
+    })
   }));
 }
 
 function downloadDependenciesCSV(exportData, filename) {
   const rows = [];
-  rows.push(['Object API Name', 'Type', 'Record Type', 'Picklist Field', 'Dependent Field', 'Controlling Field', 'Controlling Value', 'Dependent Value']);
+  rows.push(['Object API Name', 'Type', 'Record Type', 'Picklist Field', 'Dependent Field', 'Controlling Field', 'Controlling Value Label', 'Controlling Value API', 'Dependent Value Label', 'Dependent Value API']);
 
   // Field dependency rows
   for (const fieldDep of exportData.fields) {
@@ -609,17 +646,19 @@ function downloadDependenciesCSV(exportData, filename) {
           '',
           fieldDep.dependentField,
           fieldDep.controllingField,
-          mapping.controllingValue,
-          mapping.dependentValue
+          mapping.controllingValueLabel,
+          mapping.controllingValueApi,
+          mapping.dependentValueLabel,
+          mapping.dependentValueApi
         ]);
       }
     } else {
-      rows.push([exportData.object, 'Field Dependency', '', '', fieldDep.dependentField, fieldDep.controllingField, '(No mappings)', '']);
+      rows.push([exportData.object, 'Field Dependency', '', '', fieldDep.dependentField, fieldDep.controllingField, '(No mappings)', '', '', '']);
     }
   }
 
   if (exportData.fields.length === 0) {
-    rows.push([exportData.object, 'Field Dependency', '', '', '(No field dependencies)', '', '', '']);
+    rows.push([exportData.object, 'Field Dependency', '', '', '(No field dependencies)', '', '', '', '', '']);
   }
 
   // Record type picklist rows
@@ -636,12 +675,14 @@ function downloadDependenciesCSV(exportData, filename) {
                 picklistValue.picklist,
                 '',
                 '',
+                value.label || value.fullName,
+                value.fullName,
                 '',
-                value
+                ''
               ]);
             }
           } else {
-            rows.push([exportData.object, 'Record Type Picklist', recordType.recordType, picklistValue.picklist, '', '', '', '(No values)']);
+            rows.push([exportData.object, 'Record Type Picklist', recordType.recordType, picklistValue.picklist, '', '', '(No values)', '', '', '']);
           }
         }
       }
