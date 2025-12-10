@@ -475,11 +475,25 @@ body {
   color: var(--brand-color-neutral-med);
   border-radius: var(--border-radius-sm);
   transition: all var(--transition-base);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rule-action-btn:hover {
   background: var(--brand-color-neutral-light);
   color: var(--brand-color-cta);
+}
+
+.rule-link-btn {
+  color: var(--brand-color-cta);
+}
+
+.rule-link-btn:hover {
+  background: var(--brand-color-link-bg);
+  color: var(--brand-color-cta);
+  transform: scale(1.05);
 }
 
 /* Status Badge */
@@ -968,6 +982,15 @@ body {
 
 [data-theme="dark"] .rule-action-btn:hover {
   background: var(--brand-color-bg-tertiary);
+  color: var(--brand-color-cta);
+}
+
+[data-theme="dark"] .rule-link-btn {
+  color: var(--brand-color-cta);
+}
+
+[data-theme="dark"] .rule-link-btn:hover {
+  background: var(--brand-color-link-bg);
   color: var(--brand-color-cta);
 }
 
