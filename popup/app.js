@@ -165,6 +165,7 @@ function setupEventListeners() {
   document.getElementById('validationRulesBtn').addEventListener('click', handleValidationRules);
   document.getElementById('permissionComparisonBtn').addEventListener('click', handlePermissionComparison);
   document.getElementById('orgCompareBtn').addEventListener('click', handleOrgCompare);
+  document.getElementById('recordMigratorBtn').addEventListener('click', handleRecordMigrator);
   document.getElementById('deploymentHistoryBtn').addEventListener('click', handleDeploymentHistory);
   document.getElementById('exportFieldsBtn').addEventListener('click', handleExportFields);
   document.getElementById('settingsBtn').addEventListener('click', handleSettings);
@@ -1957,6 +1958,22 @@ function handleOrgCompare() {
   } catch (error) {
     console.error('[Popup] Failed to open Org Compare Tool:', error);
     alert(`Failed to open Org Compare Tool: ${error.message}`);
+  }
+}
+
+function handleRecordMigrator() {
+  try {
+    console.log('[Popup] Opening Record Migrator...');
+
+    const recordMigratorUrl = chrome.runtime.getURL('pages/record-migrator/record-migrator.html');
+
+    chrome.tabs.create({ url: recordMigratorUrl }, (tab) => {
+      console.log('[Popup] Record Migrator opened in tab:', tab.id);
+    });
+
+  } catch (error) {
+    console.error('[Popup] Failed to open Record Migrator:', error);
+    alert(`Failed to open Record Migrator: ${error.message}`);
   }
 }
 

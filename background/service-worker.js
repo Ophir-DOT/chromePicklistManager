@@ -6,6 +6,7 @@ import SalesforceAPI from './api-client.js';
 import UpdateChecker from './update-checker.js';
 import HealthCheckAPI from './health-check-api.js';
 import DeploymentHistoryAPI from './deployment-history-api.js';
+import RecordMigratorAPI from './record-migrator-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -160,8 +161,18 @@ async function handleMessage(request, sender, sendResponse) {
         break;
 
       case 'GET_OBJECTS':
-        const objects = await getObjects();
-        sendResponse({ success: true, data: objects });
+        // Check if request includes session info (Record Migrator)
+        if (request.sessionId && request.instanceUrl) {
+          const objects = await RecordMigratorAPI.getObjects({
+            sessionId: request.sessionId,
+            instanceUrl: request.instanceUrl
+          });
+          sendResponse({ success: true, data: objects });
+        } else {
+          // Legacy behavior for other tools
+          const objects = await getObjects();
+          sendResponse({ success: true, data: objects });
+        }
         break;
 
       case 'CHECK_FOR_UPDATES':
@@ -232,6 +243,46 @@ async function handleMessage(request, sender, sendResponse) {
       case 'GET_DEPLOYMENT_STATISTICS':
         const stats = await DeploymentHistoryAPI.getStatistics(request.payload);
         sendResponse({ success: true, data: stats });
+        break;
+
+      // ============================================================
+      // Record Migrator Actions
+      // ============================================================
+
+      case 'GET_ACTIVE_SESSIONS':
+        const sessions = await RecordMigratorAPI.getAllActiveSessions();
+        sendResponse({ success: true, data: sessions });
+        break;
+
+      case 'QUERY_RECORDS':
+        const queryResult = await RecordMigratorAPI.queryRecords(
+          {
+            sessionId: request.sessionId,
+            instanceUrl: request.instanceUrl
+          },
+          request.soql
+        );
+        sendResponse({ success: true, data: queryResult });
+        break;
+
+      case 'GET_CHILD_RELATIONSHIPS':
+        const relationships = await RecordMigratorAPI.getChildRelationships(
+          {
+            sessionId: request.sessionId,
+            instanceUrl: request.instanceUrl
+          },
+          request.objectName
+        );
+        sendResponse({ success: true, data: relationships });
+        break;
+
+      case 'MIGRATE_RECORDS':
+        const migrationResults = await RecordMigratorAPI.migrateRecords(
+          request.sourceSession,
+          request.targetSession,
+          request.config
+        );
+        sendResponse({ success: true, data: migrationResults });
         break;
 
       default:
@@ -709,6 +760,12 @@ chrome.commands.onCommand.addListener(async (command) => {
         setTimeout(() => {
           chrome.runtime.sendMessage({ action: 'TRIGGER_CHECK_SHARE_FILES' });
         }, 100);
+        break;
+
+      case 'record-migrator':
+        // Directly open Record Migrator in new tab
+        const recordMigratorUrl = chrome.runtime.getURL('pages/record-migrator/record-migrator.html');
+        await chrome.tabs.create({ url: recordMigratorUrl });
         break;
 
       default:
