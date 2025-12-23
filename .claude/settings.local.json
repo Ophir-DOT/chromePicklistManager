@@ -7,7 +7,8 @@
       "Bash(node --check:*)",
       "Bash(cat:*)",
       "Bash(node -c:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []

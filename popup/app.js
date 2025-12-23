@@ -1914,7 +1914,7 @@ async function handleHealthCheck() {
     console.log('[Popup] Starting Progressive DOT Health Check...');
 
     // Open health check page immediately (no loading overlay)
-    const healthCheckUrl = chrome.runtime.getURL('health-check/health-check.html');
+    const healthCheckUrl = chrome.runtime.getURL('pages/health-check/health-check.html');
 
     chrome.tabs.create({ url: healthCheckUrl }, (tab) => {
       console.log('[Popup] Progressive health check page opened in tab:', tab.id);
@@ -1930,7 +1930,7 @@ function handleBatchJobMonitor() {
   try {
     console.log('[Popup] Opening Batch Job Monitor...');
 
-    const batchJobUrl = chrome.runtime.getURL('batch-jobs/batch-jobs.html');
+    const batchJobUrl = chrome.runtime.getURL('pages/batch-jobs/batch-jobs.html');
 
     chrome.tabs.create({ url: batchJobUrl }, (tab) => {
       console.log('[Popup] Batch Job Monitor opened in tab:', tab.id);
@@ -1946,7 +1946,7 @@ function handleValidationRules() {
   try {
     console.log('[Popup] Opening Validation Rules Manager...');
 
-    const validationRulesUrl = chrome.runtime.getURL('validation-rules/validation-rules.html');
+    const validationRulesUrl = chrome.runtime.getURL('pages/validation-rules/validation-rules.html');
 
     chrome.tabs.create({ url: validationRulesUrl }, (tab) => {
       console.log('[Popup] Validation Rules Manager opened in tab:', tab.id);
@@ -1962,7 +1962,7 @@ function handlePermissionComparison() {
   try {
     console.log('[Popup] Opening Permission Comparison...');
 
-    const permissionComparisonUrl = chrome.runtime.getURL('permissions/permissions.html');
+    const permissionComparisonUrl = chrome.runtime.getURL('pages/permission-compare/permissions.html');
 
     chrome.tabs.create({ url: permissionComparisonUrl }, (tab) => {
       console.log('[Popup] Permission Comparison opened in tab:', tab.id);
@@ -1978,7 +1978,7 @@ function handleOrgCompare() {
   try {
     console.log('[Popup] Opening Org Compare Tool...');
 
-    const orgCompareUrl = chrome.runtime.getURL('org-compare/org-compare.html');
+    const orgCompareUrl = chrome.runtime.getURL('pages/org-compare/org-compare.html');
 
     chrome.tabs.create({ url: orgCompareUrl }, (tab) => {
       console.log('[Popup] Org Compare Tool opened in tab:', tab.id);
@@ -2088,7 +2088,7 @@ function handleExportFields() {
   try {
     console.log('[Popup] Opening Export Fields...');
 
-    const exportFieldsUrl = chrome.runtime.getURL('export-fields/export-fields.html');
+    const exportFieldsUrl = chrome.runtime.getURL('pages/export-fields/export-fields.html');
 
     chrome.tabs.create({ url: exportFieldsUrl }, (tab) => {
       console.log('[Popup] Export Fields opened in tab:', tab.id);

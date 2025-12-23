@@ -62,12 +62,16 @@ chromePicklistManager/
 │   ├── app.js                 # Popup logic
 │   └── styles.css             # Popup styles
 ├── pages/                     # Full-page tools (opened in new tabs)
-│   ├── health-check/
+│   ├── approval-process-check/
+│   ├── batch-jobs/
+│   ├── deployment-history/
 │   ├── export-fields/
+│   ├── health-check/
 │   ├── org-compare/
 │   ├── permission-compare/
-│   ├── validation-rules/
-│   └── batch-monitor/
+│   ├── picklist-management/
+│   ├── record-migrator/
+│   └── validation-rules/
 ├── settings/
 │   ├── settings.html
 │   ├── settings.js

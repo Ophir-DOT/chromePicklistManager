@@ -803,7 +803,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
       case 'health-check':
         // Directly open health check in new tab
-        const healthCheckUrl = chrome.runtime.getURL('health-check/health-check.html');
+        const healthCheckUrl = chrome.runtime.getURL('pages/health-check/health-check.html');
         await chrome.tabs.create({ url: healthCheckUrl });
         break;
 
