@@ -27,6 +27,9 @@ let selectedUpdateField = null;
 let currentFieldMetadata = null;
 let previewData = null;
 
+// Picklist Loader lock state
+let isPicklistLoaderUnlocked = false;
+
 // Dependency Loader state
 let parsedDepsData = null;
 let isUnlocked = false;
@@ -41,6 +44,23 @@ let depsPreviewData = null;
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize theme
   await ThemeManager.initTheme();
+
+  // Check for stored unlock status
+  try {
+    const stored = await chrome.storage.session.get(['picklistLoaderUnlocked', 'dependencyLoaderUnlocked']);
+    if (stored.picklistLoaderUnlocked) {
+      isPicklistLoaderUnlocked = true;
+      const lockIcon = document.querySelector('[data-tab="picklist-loader"] .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+    }
+    if (stored.dependencyLoaderUnlocked) {
+      isUnlocked = true;
+      const lockIcon = document.querySelector('[data-tab="dependency-loader"] .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+    }
+  } catch (error) {
+    console.warn('[Picklist Management] Could not check unlock status:', error);
+  }
 
   // Load and display org info
   await loadOrgInfo();
@@ -98,6 +118,14 @@ function setupTabs() {
   tabButtons.forEach(button => {
     button.addEventListener('click', () => {
       const targetTab = button.dataset.tab;
+
+      // Handle locked picklist loader tab
+      if (button.classList.contains('locked-feature') && targetTab === 'picklist-loader') {
+        if (!isPicklistLoaderUnlocked) {
+          showPicklistLoaderUnlock();
+          return;
+        }
+      }
 
       // Handle locked dependency loader tab
       if (button.classList.contains('locked-feature') && targetTab === 'dependency-loader') {
@@ -716,6 +744,7 @@ function downloadDependenciesCSV(exportData, filename) {
 // ============================================
 
 function setupPicklistLoaderListeners() {
+  document.getElementById('unlockPicklistLoaderBtn')?.addEventListener('click', unlockPicklistLoader);
   document.getElementById('updateObjectSelect')?.addEventListener('change', handleUpdateObjectChange);
   document.getElementById('updateFieldSelect')?.addEventListener('change', handleUpdateFieldChange);
   document.getElementById('csvTextarea')?.addEventListener('input', handleCSVInput);
@@ -725,6 +754,16 @@ function setupPicklistLoaderListeners() {
 }
 
 async function loadPicklistLoaderData() {
+  // Check if unlocked
+  if (!isPicklistLoaderUnlocked) {
+    document.getElementById('picklistLoaderUnlockSection').classList.remove('hidden');
+    document.getElementById('picklistLoaderContent').classList.add('hidden');
+    return;
+  } else {
+    document.getElementById('picklistLoaderUnlockSection').classList.add('hidden');
+    document.getElementById('picklistLoaderContent').classList.remove('hidden');
+  }
+
   const selectEl = document.getElementById('updateObjectSelect');
 
   try {
@@ -1779,6 +1818,77 @@ function resetDependencyLoader() {
   document.getElementById('dependencyLoaderStatus').textContent = '';
   document.getElementById('dependencyLoaderStatus').className = 'status-message';
 }
+
+// ============================================
+// PICKLIST LOADER UNLOCK FUNCTIONS
+// ============================================
+
+async function showPicklistLoaderUnlock() {
+  // Switch to picklist loader tab and show unlock form
+  document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+  document.querySelector('[data-tab="picklist-loader"]').classList.add('active');
+  document.getElementById('picklist-loader').classList.add('active');
+
+  document.getElementById('picklistLoaderUnlockSection').classList.remove('hidden');
+  document.getElementById('picklistLoaderContent').classList.add('hidden');
+}
+
+async function unlockPicklistLoader() {
+  const password = document.getElementById('picklistLoaderPassword').value;
+  const statusEl = document.getElementById('picklistLoaderUnlockStatus');
+  const unlockBtn = document.getElementById('unlockPicklistLoaderBtn');
+
+  if (!password) {
+    statusEl.textContent = 'Please enter a password';
+    statusEl.className = 'status-message error';
+    return;
+  }
+
+  try {
+    unlockBtn.disabled = true;
+    statusEl.textContent = 'Validating...';
+    statusEl.className = 'status-message loading';
+
+    // Use the same password as Dependency Loader
+    const validKey = 'DOT-DEPS-2024';
+
+    if (password === validKey) {
+      isPicklistLoaderUnlocked = true;
+      await chrome.storage.session.set({ picklistLoaderUnlocked: true });
+
+      statusEl.textContent = '✓ Unlocked successfully!';
+      statusEl.className = 'status-message success';
+
+      setTimeout(async () => {
+        document.getElementById('picklistLoaderUnlockSection').classList.add('hidden');
+        document.getElementById('picklistLoaderContent').classList.remove('hidden');
+        document.getElementById('picklistLoaderPassword').value = '';
+        statusEl.textContent = '';
+
+        // Remove lock icon from tab
+        const lockIcon = document.querySelector('[data-tab="picklist-loader"] .lock-icon');
+        if (lockIcon) lockIcon.style.display = 'none';
+
+        // Load objects after showing the content
+        console.log('[Picklist Management] Loading objects after picklist loader unlock...');
+        await loadPicklistLoaderData();
+      }, 1000);
+    } else {
+      throw new Error('Invalid password');
+    }
+  } catch (error) {
+    console.error('[Picklist Management] Picklist Loader unlock failed:', error);
+    statusEl.textContent = 'Invalid password. Access denied.';
+    statusEl.className = 'status-message error';
+    unlockBtn.disabled = false;
+  }
+}
+
+// ============================================
+// DEPENDENCY LOADER UNLOCK FUNCTIONS
+// ============================================
 
 async function showDependencyLoaderUnlock() {
   // Switch to dependency loader tab and show unlock form

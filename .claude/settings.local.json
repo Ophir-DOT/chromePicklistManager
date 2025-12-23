@@ -5,9 +5,15 @@
       "Bash(find:*)",
       "Bash(nul)",
       "Bash(node --check:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(node -c:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ]
 }

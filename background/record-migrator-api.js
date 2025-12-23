@@ -308,13 +308,54 @@ const RecordMigratorAPI = {
       const describe = await response.json();
       const fields = describe.fields || [];
 
-      // Filter out non-createable fields
-      return fields
+      // Filter out non-createable fields, but always include Id and Name
+      const createableFields = fields
         .filter(field => field.createable && !field.calculated)
         .map(field => field.name);
 
+      // Always include Id (for source record tracking) and Name (for reporting)
+      // These are queried but not inserted into target
+      const requiredFields = ['Id', 'Name'];
+      requiredFields.forEach(reqField => {
+        if (!createableFields.includes(reqField)) {
+          createableFields.unshift(reqField);
+        }
+      });
+
+      return createableFields;
+
     } catch (error) {
       console.error('[RecordMigratorAPI] Error getting object fields:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get full field metadata for an object
+   * @param {Object} session - Session object
+   * @param {string} objectName - API name of the object
+   * @returns {Promise<Array>} Array of field metadata objects
+   */
+  async getObjectFieldMetadata(session, objectName) {
+    try {
+      const endpoint = `${session.instanceUrl}/services/data/v59.0/sobjects/${objectName}/describe`;
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${session.sessionId}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to describe ${objectName}: ${response.status}`);
+      }
+
+      const describe = await response.json();
+      return describe.fields || [];
+
+    } catch (error) {
+      console.error('[RecordMigratorAPI] Error getting field metadata:', error);
       throw error;
     }
   },
@@ -495,16 +536,18 @@ const RecordMigratorAPI = {
         // Prepare records for insert (remove Id and attributes)
         const recordsToInsert = batch.map(record => {
           const sourceId = record.Id;
+          const sourceName = record.Name; // Store for reporting
           const cleanRecord = { ...record };
           delete cleanRecord.Id;
           delete cleanRecord.attributes;
 
-          // Remove system fields
+          // Remove system fields and read-only fields
           delete cleanRecord.CreatedDate;
           delete cleanRecord.CreatedById;
           delete cleanRecord.LastModifiedDate;
           delete cleanRecord.LastModifiedById;
           delete cleanRecord.SystemModstamp;
+          delete cleanRecord.Name; // Name is queried for reporting but often read-only on target
 
           // Store source ID in external ID field if specified
           if (externalIdField) {
@@ -518,7 +561,7 @@ const RecordMigratorAPI = {
             console.log(`[RecordMigratorAPI] Remapped State ID: ${originalStateId} -> ${cleanRecord.CompSuite__State__c}`);
           }
 
-          return { sourceId, record: cleanRecord };
+          return { sourceId, sourceName, record: cleanRecord };
         });
 
         // Use SObject Collection API for batch insert
@@ -676,9 +719,10 @@ const RecordMigratorAPI = {
    * @param {Object} sourceSession - Source session
    * @param {Object} targetSession - Target session
    * @param {Object} config - Migration configuration
+   * @param {Function} onProgress - Optional progress callback (step, current, total, message)
    * @returns {Promise<Object>} Migration results
    */
-  async migrateRecords(sourceSession, targetSession, config) {
+  async migrateRecords(sourceSession, targetSession, config, onProgress = null) {
     try {
       console.log('[RecordMigratorAPI] Starting migration...');
       console.log('[RecordMigratorAPI] Config:', config);
@@ -689,11 +733,32 @@ const RecordMigratorAPI = {
         childSuccess: 0,
         childFailed: 0,
         errors: [],
-        idMapping: {}
+        detailedErrors: [], // Enhanced error tracking
+        idMapping: {},
+        createdRecordIds: [], // For rollback capability
+        migratedRecords: [] // Full record data for report (sourceId, targetId, name, record)
+      };
+
+      // Calculate total operations for progress tracking
+      const totalParentRecords = config.recordIds.length;
+      let estimatedChildRecords = 0;
+      if (config.relationships && config.relationships.length > 0) {
+        estimatedChildRecords = config.relationships.reduce((sum, rel) => sum + (rel.estimatedCount || 0), 0);
+      }
+      const totalOperations = totalParentRecords + estimatedChildRecords;
+
+      // Helper function to send progress updates
+      const sendProgress = (step, current, total, message) => {
+        if (onProgress) {
+          const percentage = Math.round((current / total) * 100);
+          onProgress(step, current, total, message, percentage);
+        }
       };
 
       // Step 1: Export parent records
       console.log('[RecordMigratorAPI] Step 1: Exporting parent records...');
+      sendProgress('Exporting Parent Records', 0, totalOperations, `Exporting ${totalParentRecords} parent records...`);
+
       const parentRecords = await this.exportParentRecords(
         sourceSession,
         config.objectName,
@@ -704,8 +769,12 @@ const RecordMigratorAPI = {
         throw new Error('No parent records found to migrate');
       }
 
+      sendProgress('Exporting Parent Records', totalParentRecords, totalOperations, `Exported ${parentRecords.length} parent records`);
+
       // Step 1.5: Build State ID mapping if CompSuite__State__c field exists
       console.log('[RecordMigratorAPI] Step 1.5: Building State ID mapping...');
+      sendProgress('Building ID Mapping', totalParentRecords, totalOperations, 'Building State ID mapping...');
+
       const stateIdMapping = await this.buildStateIdMapping(
         sourceSession,
         targetSession,
@@ -714,26 +783,36 @@ const RecordMigratorAPI = {
 
       // Step 2: Upsert parent records to target org
       console.log('[RecordMigratorAPI] Step 2: Upserting parent records...');
-      const parentResults = await this.upsertParentRecords(
+      const parentResults = await this.upsertParentRecordsWithProgress(
         targetSession,
         config.objectName,
         parentRecords,
-        config.externalIdField, // Pass external ID field for storing source IDs
-        stateIdMapping // Pass State ID mapping for remapping
+        config.externalIdField,
+        stateIdMapping,
+        (current, total) => {
+          sendProgress('Upserting Parent Records', current, totalOperations, `Upserting parent records (${current}/${total})`);
+        }
       );
 
       results.parentSuccess = parentResults.success;
       results.parentFailed = parentResults.failed;
       results.errors.push(...parentResults.errors);
+      results.detailedErrors.push(...parentResults.detailedErrors);
       results.idMapping = parentResults.idMapping;
+      results.createdRecordIds.push(...parentResults.createdRecordIds);
+      results.migratedRecords.push(...(parentResults.migratedRecords || []));
 
       // Step 3: Process child relationships (if any)
       if (config.relationships && config.relationships.length > 0) {
         console.log('[RecordMigratorAPI] Step 3: Processing child relationships...');
 
+        let processedChildCount = 0;
+
         for (const relationship of config.relationships) {
           try {
             // Export child records
+            sendProgress('Exporting Child Records', totalParentRecords + processedChildCount, totalOperations, `Exporting ${relationship.childSObject}...`);
+
             const childRecords = await this.exportChildRecords(
               sourceSession,
               relationship,
@@ -746,24 +825,40 @@ const RecordMigratorAPI = {
             }
 
             // Upsert child records with remapped parent IDs and State IDs
-            const childResults = await this.upsertChildRecords(
+            const childResults = await this.upsertChildRecordsWithProgress(
               targetSession,
               relationship,
               childRecords,
               results.idMapping,
-              stateIdMapping // Pass State ID mapping for child records too
+              stateIdMapping,
+              (current, total) => {
+                sendProgress('Upserting Child Records', totalParentRecords + processedChildCount + current, totalOperations, `Upserting ${relationship.childSObject} (${current}/${total})`);
+              }
             );
 
             results.childSuccess += childResults.success;
             results.childFailed += childResults.failed;
             results.errors.push(...childResults.errors);
+            results.detailedErrors.push(...childResults.detailedErrors);
+            results.createdRecordIds.push(...childResults.createdRecordIds);
+
+            processedChildCount += childRecords.length;
 
           } catch (error) {
             console.error('[RecordMigratorAPI] Error processing relationship:', relationship.childSObject, error);
+            const errorDetail = {
+              code: 'RELATIONSHIP_MIGRATION_FAILED',
+              relationship: relationship.childSObject,
+              message: error.message
+            };
             results.errors.push(`Failed to migrate ${relationship.childSObject}: ${error.message}`);
+            results.detailedErrors.push(errorDetail);
           }
         }
       }
+
+      // Send completion progress
+      sendProgress('Migration Complete', totalOperations, totalOperations, 'Migration completed successfully!');
 
       console.log('[RecordMigratorAPI] Migration complete!');
       console.log('[RecordMigratorAPI] Results:', results);
@@ -774,6 +869,405 @@ const RecordMigratorAPI = {
       console.error('[RecordMigratorAPI] Migration failed:', error);
       throw error;
     }
+  },
+
+  /**
+   * Upsert parent records with progress tracking
+   * Uses UPSERT via external ID field when available, otherwise uses INSERT
+   * @param {Object} targetSession - Target session
+   * @param {string} objectName - Object API name
+   * @param {Array} records - Records to upsert
+   * @param {string} externalIdField - Optional external ID field for upsert
+   * @param {Object} stateIdMapping - Optional State ID mapping
+   * @param {Function} onProgress - Progress callback (current, total)
+   * @returns {Promise<Object>} Upsert results with ID mapping
+   */
+  async upsertParentRecordsWithProgress(targetSession, objectName, records, externalIdField = null, stateIdMapping = {}, onProgress = null) {
+    try {
+      console.log('[RecordMigratorAPI] Upserting', records.length, 'parent records...');
+      if (externalIdField) {
+        console.log('[RecordMigratorAPI] Using UPSERT with external ID field:', externalIdField);
+      } else {
+        console.log('[RecordMigratorAPI] Using INSERT (no external ID field)');
+      }
+      if (Object.keys(stateIdMapping).length > 0) {
+        console.log('[RecordMigratorAPI] Using State ID mapping for', Object.keys(stateIdMapping).length, 'states');
+      }
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [],
+        detailedErrors: [],
+        idMapping: {},
+        createdRecordIds: [],
+        migratedRecords: [] // Store full record data for report
+      };
+
+      // Process in batches of 200 (API limit)
+      const batchSize = 200;
+      let processedCount = 0;
+
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+
+        // Prepare records for upsert/insert (remove Id and attributes)
+        const recordsToProcess = batch.map(record => {
+          const sourceId = record.Id;
+          const sourceName = record.Name; // Store for reporting
+          const cleanRecord = { ...record };
+          delete cleanRecord.Id;
+          delete cleanRecord.attributes;
+
+          // Remove system fields and read-only fields
+          delete cleanRecord.CreatedDate;
+          delete cleanRecord.CreatedById;
+          delete cleanRecord.LastModifiedDate;
+          delete cleanRecord.LastModifiedById;
+          delete cleanRecord.SystemModstamp;
+          delete cleanRecord.Name; // Name is queried for reporting but often read-only on target
+
+          // Store source ID in external ID field if specified
+          if (externalIdField) {
+            cleanRecord[externalIdField] = sourceId;
+          }
+
+          // Remap CompSuite__State__c field if present and mapping exists
+          if (cleanRecord.CompSuite__State__c && stateIdMapping[cleanRecord.CompSuite__State__c]) {
+            const originalStateId = cleanRecord.CompSuite__State__c;
+            cleanRecord.CompSuite__State__c = stateIdMapping[originalStateId];
+            console.log(`[RecordMigratorAPI] Remapped State ID: ${originalStateId} -> ${cleanRecord.CompSuite__State__c}`);
+          }
+
+          return { sourceId, sourceName, record: cleanRecord };
+        });
+
+        let batchResults;
+
+        if (externalIdField) {
+          // Use UPSERT via individual API calls for each record
+          // This is more reliable for external ID upserts
+          batchResults = [];
+
+          for (const recordToProcess of recordsToProcess) {
+            try {
+              const externalIdValue = recordToProcess.record[externalIdField];
+
+              if (!externalIdValue) {
+                // Should not happen, but handle gracefully
+                batchResults.push({
+                  success: false,
+                  errors: [{ message: `External ID field '${externalIdField}' is empty` }]
+                });
+                continue;
+              }
+
+              // Use UPSERT endpoint: PATCH /sobjects/{objectName}/{externalIdField}/{externalIdValue}
+              const upsertEndpoint = `${targetSession.instanceUrl}/services/data/v59.0/sobjects/${objectName}/${externalIdField}/${encodeURIComponent(externalIdValue)}`;
+
+              const upsertResponse = await fetch(upsertEndpoint, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${targetSession.sessionId}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(recordToProcess.record)
+              });
+
+              if (upsertResponse.ok) {
+                // PATCH response includes the created/updated record ID
+                const upsertResult = await upsertResponse.json();
+                batchResults.push({
+                  success: true,
+                  id: upsertResult.id || recordToProcess.sourceId
+                });
+              } else if (upsertResponse.status === 201 || upsertResponse.status === 200) {
+                // Record created or updated successfully
+                const upsertResult = await upsertResponse.json();
+                batchResults.push({
+                  success: true,
+                  id: upsertResult.id || recordToProcess.sourceId
+                });
+              } else {
+                // Error occurred
+                const errorText = await upsertResponse.text();
+                let errorObj;
+                try {
+                  errorObj = JSON.parse(errorText);
+                  if (Array.isArray(errorObj)) {
+                    batchResults.push({
+                      success: false,
+                      errors: errorObj
+                    });
+                  } else {
+                    batchResults.push({
+                      success: false,
+                      errors: [{ message: errorObj.message || errorText }]
+                    });
+                  }
+                } catch (e) {
+                  batchResults.push({
+                    success: false,
+                    errors: [{ message: `UPSERT failed: ${upsertResponse.status} - ${errorText}` }]
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('[RecordMigratorAPI] Error upserting record:', error);
+              batchResults.push({
+                success: false,
+                errors: [{ message: error.message }]
+              });
+            }
+          }
+        } else {
+          // Use composite/sobjects API for batch INSERT when no external ID field
+          const endpoint = `${targetSession.instanceUrl}/services/data/v59.0/composite/sobjects`;
+
+          const requestBody = {
+            allOrNone: false,
+            records: recordsToProcess.map(r => ({
+              attributes: { type: objectName },
+              ...r.record
+            }))
+          };
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${targetSession.sessionId}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            throw new Error(`INSERT failed: ${response.status} ${response.statusText}`);
+          }
+
+          batchResults = await response.json();
+        }
+
+        // Process results and build ID mapping
+        batchResults.forEach((result, index) => {
+          if (result.success) {
+            results.success++;
+            const processedRecord = recordsToProcess[index];
+            results.idMapping[processedRecord.sourceId] = result.id;
+            results.createdRecordIds.push(result.id);
+            // Store full record data for report
+            results.migratedRecords.push({
+              sourceId: processedRecord.sourceId,
+              targetId: result.id,
+              name: processedRecord.sourceName || processedRecord.sourceId,
+              record: processedRecord.record // The cleaned record that was inserted
+            });
+          } else {
+            results.failed++;
+            const errorMessage = result.errors.map(e => e.message).join(', ');
+            const errorCode = this.categorizeError(result.errors[0]);
+
+            const detailedError = {
+              code: errorCode,
+              recordId: recordsToProcess[index].sourceId,
+              objectType: objectName,
+              message: errorMessage,
+              errors: result.errors
+            };
+
+            results.errors.push(`Record ${recordsToProcess[index].sourceId}: ${errorMessage}`);
+            results.detailedErrors.push(detailedError);
+          }
+        });
+
+        processedCount += batch.length;
+        if (onProgress) {
+          onProgress(processedCount, records.length);
+        }
+      }
+
+      console.log('[RecordMigratorAPI] Parent upsert complete:', results.success, 'success,', results.failed, 'failed');
+      return results;
+
+    } catch (error) {
+      console.error('[RecordMigratorAPI] Error upserting parent records:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Upsert child records with progress tracking
+   * @param {Object} targetSession - Target session
+   * @param {Object} relationship - Relationship metadata
+   * @param {Array} records - Child records to upsert
+   * @param {Object} idMapping - Parent ID mapping (sourceId -> targetId)
+   * @param {Object} stateIdMapping - Optional State ID mapping
+   * @param {Function} onProgress - Progress callback (current, total)
+   * @returns {Promise<Object>} Upsert results
+   */
+  async upsertChildRecordsWithProgress(targetSession, relationship, records, idMapping, stateIdMapping = {}, onProgress = null) {
+    try {
+      console.log('[RecordMigratorAPI] Upserting', records.length, 'child records for', relationship.childSObject);
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [],
+        detailedErrors: [],
+        createdRecordIds: []
+      };
+
+      // Process in batches
+      const batchSize = 200;
+      let processedCount = 0;
+
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+
+        // Remap parent IDs and prepare records
+        const recordsToInsert = batch.map(record => {
+          const cleanRecord = { ...record };
+          delete cleanRecord.Id;
+          delete cleanRecord.attributes;
+
+          // Remove system fields
+          delete cleanRecord.CreatedDate;
+          delete cleanRecord.CreatedById;
+          delete cleanRecord.LastModifiedDate;
+          delete cleanRecord.LastModifiedById;
+          delete cleanRecord.SystemModstamp;
+
+          // Remap parent lookup field
+          const oldParentId = record[relationship.field];
+          const newParentId = idMapping[oldParentId];
+
+          if (newParentId) {
+            cleanRecord[relationship.field] = newParentId;
+          } else {
+            console.warn('[RecordMigratorAPI] No mapping found for parent ID:', oldParentId);
+          }
+
+          // Remap CompSuite__State__c field if present and mapping exists
+          if (cleanRecord.CompSuite__State__c && stateIdMapping[cleanRecord.CompSuite__State__c]) {
+            const originalStateId = cleanRecord.CompSuite__State__c;
+            cleanRecord.CompSuite__State__c = stateIdMapping[originalStateId];
+            console.log(`[RecordMigratorAPI] Remapped State ID in child record: ${originalStateId} -> ${cleanRecord.CompSuite__State__c}`);
+          }
+
+          return { sourceId: record.Id, record: cleanRecord };
+        });
+
+        // Use SObject Collection API for batch insert
+        const endpoint = `${targetSession.instanceUrl}/services/data/v59.0/composite/sobjects`;
+
+        const requestBody = {
+          allOrNone: false,
+          records: recordsToInsert.map(r => ({
+            attributes: { type: relationship.childSObject },
+            ...r.record
+          }))
+        };
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${targetSession.sessionId}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upsert failed: ${response.status} ${response.statusText}`);
+        }
+
+        const batchResults = await response.json();
+
+        // Process results
+        batchResults.forEach((result, index) => {
+          if (result.success) {
+            results.success++;
+            results.createdRecordIds.push(result.id);
+          } else {
+            results.failed++;
+            const errorMessage = result.errors.map(e => e.message).join(', ');
+            const errorCode = this.categorizeError(result.errors[0]);
+
+            const detailedError = {
+              code: errorCode,
+              recordId: recordsToInsert[index].sourceId,
+              objectType: relationship.childSObject,
+              message: errorMessage,
+              errors: result.errors
+            };
+
+            results.errors.push(`${relationship.childSObject} record ${recordsToInsert[index].sourceId}: ${errorMessage}`);
+            results.detailedErrors.push(detailedError);
+          }
+        });
+
+        processedCount += batch.length;
+        if (onProgress) {
+          onProgress(processedCount, records.length);
+        }
+      }
+
+      console.log('[RecordMigratorAPI] Child upsert complete:', results.success, 'success,', results.failed, 'failed');
+      return results;
+
+    } catch (error) {
+      console.error('[RecordMigratorAPI] Error upserting child records:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Categorize error based on Salesforce error response
+   * @param {Object} error - Salesforce error object
+   * @returns {string} Error category code
+   */
+  categorizeError(error) {
+    if (!error) return 'UNKNOWN_ERROR';
+
+    const message = error.message || '';
+    const statusCode = error.statusCode || '';
+
+    // Required field missing
+    if (statusCode === 'REQUIRED_FIELD_MISSING' || message.includes('Required fields are missing')) {
+      return 'REQUIRED_FIELD_MISSING';
+    }
+
+    // Field type mismatch
+    if (message.includes('invalid field') || message.includes('type mismatch')) {
+      return 'FIELD_TYPE_MISMATCH';
+    }
+
+    // Validation rule failed
+    if (statusCode === 'FIELD_CUSTOM_VALIDATION_EXCEPTION' || message.includes('validation rule')) {
+      return 'VALIDATION_RULE_FAILED';
+    }
+
+    // Lookup not found
+    if (statusCode === 'INVALID_CROSS_REFERENCE_KEY' || message.includes('invalid cross reference')) {
+      return 'LOOKUP_NOT_FOUND';
+    }
+
+    // API limit exceeded
+    if (statusCode === 'REQUEST_LIMIT_EXCEEDED' || message.includes('limit exceeded')) {
+      return 'API_LIMIT_EXCEEDED';
+    }
+
+    // Permission denied
+    if (statusCode === 'INSUFFICIENT_ACCESS' || message.includes('insufficient access')) {
+      return 'PERMISSION_DENIED';
+    }
+
+    // Duplicate value
+    if (statusCode === 'DUPLICATE_VALUE' || message.includes('duplicate')) {
+      return 'DUPLICATE_VALUE';
+    }
+
+    return 'UNKNOWN_ERROR';
   }
 };
 

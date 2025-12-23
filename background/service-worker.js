@@ -7,6 +7,7 @@ import UpdateChecker from './update-checker.js';
 import HealthCheckAPI from './health-check-api.js';
 import DeploymentHistoryAPI from './deployment-history-api.js';
 import RecordMigratorAPI from './record-migrator-api.js';
+import RollbackAPI from './rollback-api.js';
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -277,12 +278,65 @@ async function handleMessage(request, sender, sendResponse) {
         break;
 
       case 'MIGRATE_RECORDS':
+        // Extract port for progress updates if provided
+        const port = request.progressPort ? chrome.runtime.connect({ name: request.progressPort }) : null;
+
         const migrationResults = await RecordMigratorAPI.migrateRecords(
           request.sourceSession,
           request.targetSession,
-          request.config
+          request.config,
+          // Progress callback
+          (step, current, total, message, percentage) => {
+            if (port) {
+              try {
+                port.postMessage({
+                  type: 'MIGRATION_PROGRESS',
+                  step: step,
+                  current: current,
+                  total: total,
+                  message: message,
+                  percentage: percentage
+                });
+              } catch (error) {
+                console.warn('[ServiceWorker] Failed to send progress update:', error);
+              }
+            }
+            // Also send via sendResponse for backward compatibility (though this won't work for real-time updates)
+            console.log(`[ServiceWorker] Migration Progress: ${step} - ${message} (${percentage}%)`);
+          }
         );
+
         sendResponse({ success: true, data: migrationResults });
+        break;
+
+      case 'ROLLBACK_MIGRATION':
+        const rollbackResults = await RollbackAPI.rollbackMigration(
+          request.targetSession,
+          request.recordIds,
+          (current, total, percentage) => {
+            console.log(`[ServiceWorker] Rollback Progress: ${current}/${total} (${percentage}%)`);
+          }
+        );
+        sendResponse({ success: true, data: rollbackResults });
+        break;
+
+      case 'VALIDATE_ROLLBACK':
+        const validationResults = await RollbackAPI.validateRollback(
+          request.targetSession,
+          request.recordIds
+        );
+        sendResponse({ success: true, data: validationResults });
+        break;
+
+      case 'GET_FIELD_METADATA':
+        const fieldMetadata = await RecordMigratorAPI.getObjectFieldMetadata(
+          {
+            sessionId: request.sessionId,
+            instanceUrl: request.instanceUrl
+          },
+          request.objectName
+        );
+        sendResponse({ success: true, data: fieldMetadata });
         break;
 
       default:
@@ -743,10 +797,8 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
 
       case 'picklist-loader':
-        await chrome.action.openPopup();
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ action: 'TRIGGER_PICKLIST_LOADER' });
-        }, 100);
+        // Feature is password-protected - keyboard shortcut disabled
+        console.log('[ServiceWorker] Picklist Loader keyboard shortcut is disabled (feature locked)');
         break;
 
       case 'health-check':
@@ -756,16 +808,13 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
 
       case 'check-share-files':
-        await chrome.action.openPopup();
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ action: 'TRIGGER_CHECK_SHARE_FILES' });
-        }, 100);
+        // Feature is password-protected - keyboard shortcut disabled
+        console.log('[ServiceWorker] Check Share Files keyboard shortcut is disabled (feature locked)');
         break;
 
       case 'record-migrator':
-        // Directly open Record Migrator in new tab
-        const recordMigratorUrl = chrome.runtime.getURL('pages/record-migrator/record-migrator.html');
-        await chrome.tabs.create({ url: recordMigratorUrl });
+        // Feature is password-protected - keyboard shortcut disabled
+        console.log('[ServiceWorker] Record Migrator keyboard shortcut is disabled (feature locked)');
         break;
 
       default:

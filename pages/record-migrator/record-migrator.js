@@ -4,6 +4,8 @@
  */
 
 import RecordMigratorAPI from '../../background/record-migrator-api.js';
+import FieldMapper from './field-mapper.js';
+import PicklistMapper from './picklist-mapper.js';
 
 // ============================================================================
 // State Management
@@ -18,11 +20,20 @@ const state = {
   allObjects: [],
   selectedRecords: [],
   allRecords: [],
+  // Field mapping state
+  sourceFields: [],
+  targetFields: [],
+  fieldMapping: null,
+  picklistFields: [],
+  picklistMappings: {}, // fieldName -> { sourceValue: targetValue }
+  // Relationship state
   childRelationships: [],
   selectedRelationships: [],
+  // External ID state
   externalIdFields: [],
   selectedExternalIdField: null,
-  useExternalId: false,
+  useExternalId: true,
+  // Migration state
   migrationLog: [],
   migrationInProgress: false
 };
@@ -61,7 +72,27 @@ const elements = {
   step2BackBtn: document.getElementById('step2BackBtn'),
   step2NextBtn: document.getElementById('step2NextBtn'),
 
-  // Step 3: Relationship Configuration
+  // Step 3: Field Mapping
+  analyzeFieldsBtn: document.getElementById('analyzeFieldsBtn'),
+  fieldMappingPreview: document.getElementById('fieldMappingPreview'),
+  fieldMappingSummary: document.getElementById('fieldMappingSummary'),
+  exactMatchesSection: document.getElementById('exactMatchesSection'),
+  exactMatchCount: document.getElementById('exactMatchCount'),
+  exactMatchesList: document.getElementById('exactMatchesList'),
+  mismatchesSection: document.getElementById('mismatchesSection'),
+  mismatchCount: document.getElementById('mismatchCount'),
+  mismatchesList: document.getElementById('mismatchesList'),
+  missingFieldsSection: document.getElementById('missingFieldsSection'),
+  missingFieldCount: document.getElementById('missingFieldCount'),
+  missingFieldsList: document.getElementById('missingFieldsList'),
+  picklistSection: document.getElementById('picklistSection'),
+  picklistFieldCount: document.getElementById('picklistFieldCount'),
+  picklistFieldsList: document.getElementById('picklistFieldsList'),
+  mapPicklistsBtn: document.getElementById('mapPicklistsBtn'),
+  step3BackBtn: document.getElementById('step3BackBtn'),
+  step3NextBtn: document.getElementById('step3NextBtn'),
+
+  // Step 4: Relationship Configuration
   detectRelationshipsBtn: document.getElementById('detectRelationshipsBtn'),
   relationshipsPreview: document.getElementById('relationshipsPreview'),
   relationshipsTable: document.getElementById('relationshipsTable'),
@@ -69,10 +100,10 @@ const elements = {
   selectedObjectName: document.getElementById('selectedObjectName'),
   noRelationshipsMessage: document.getElementById('noRelationshipsMessage'),
   selectAllRelationships: document.getElementById('selectAllRelationships'),
-  step3BackBtn: document.getElementById('step3BackBtn'),
-  step3NextBtn: document.getElementById('step3NextBtn'),
+  step4BackBtn: document.getElementById('step4BackBtn'),
+  step4NextBtn: document.getElementById('step4NextBtn'),
 
-  // Step 4: Migration
+  // Step 5: Migration
   useExternalIdCheckbox: document.getElementById('useExternalIdCheckbox'),
   externalIdFieldContainer: document.getElementById('externalIdFieldContainer'),
   externalIdFieldSelect: document.getElementById('externalIdFieldSelect'),
@@ -89,7 +120,7 @@ const elements = {
   migrationLogContainer: document.getElementById('migrationLogContainer'),
   migrationLog: document.getElementById('migrationLog'),
   exportLogBtn: document.getElementById('exportLogBtn'),
-  step4BackBtn: document.getElementById('step4BackBtn'),
+  step5BackBtn: document.getElementById('step5BackBtn'),
   startMigrationBtn: document.getElementById('startMigrationBtn')
 };
 
@@ -100,6 +131,16 @@ const elements = {
 async function init() {
   console.log('[Record Migrator] Initializing...');
 
+  // Check if feature is unlocked
+  const unlocked = await checkUnlockStatus();
+  if (!unlocked) {
+    setupUnlockListeners();
+    return;
+  }
+
+  // Show main content
+  showMainContent();
+
   // Apply saved theme
   applyTheme();
 
@@ -108,6 +149,75 @@ async function init() {
 
   // Load active sessions
   await loadActiveSessions();
+}
+
+// ============================================================================
+// Unlock Functions
+// ============================================================================
+
+async function checkUnlockStatus() {
+  try {
+    const stored = await chrome.storage.session.get(['recordMigratorUnlocked']);
+    return stored.recordMigratorUnlocked === true;
+  } catch (error) {
+    console.warn('[Record Migrator] Could not check unlock status:', error);
+    return false;
+  }
+}
+
+function setupUnlockListeners() {
+  document.getElementById('unlockPageBtn')?.addEventListener('click', unlockPage);
+  document.getElementById('pagePassword')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') unlockPage();
+  });
+  document.getElementById('pagePassword')?.focus();
+}
+
+function showMainContent() {
+  document.getElementById('unlockGate')?.classList.add('hidden');
+  document.getElementById('mainContent')?.classList.remove('hidden');
+}
+
+async function unlockPage() {
+  const password = document.getElementById('pagePassword').value;
+  const statusEl = document.getElementById('pageUnlockStatus');
+  const unlockBtn = document.getElementById('unlockPageBtn');
+
+  if (!password) {
+    statusEl.textContent = 'Please enter a password';
+    statusEl.className = 'status-message error';
+    return;
+  }
+
+  try {
+    unlockBtn.disabled = true;
+    statusEl.textContent = 'Validating...';
+    statusEl.className = 'status-message loading';
+
+    // Use the same password as other locked features
+    const validKey = 'DOT-DEPS-2024';
+
+    if (password === validKey) {
+      await chrome.storage.session.set({ recordMigratorUnlocked: true });
+
+      statusEl.textContent = 'Unlocked successfully!';
+      statusEl.className = 'status-message success';
+
+      setTimeout(async () => {
+        showMainContent();
+        applyTheme();
+        setupEventListeners();
+        await loadActiveSessions();
+      }, 1000);
+    } else {
+      throw new Error('Invalid password');
+    }
+  } catch (error) {
+    console.error('[Record Migrator] Unlock failed:', error);
+    statusEl.textContent = 'Invalid password. Access denied.';
+    statusEl.className = 'status-message error';
+    unlockBtn.disabled = false;
+  }
 }
 
 function applyTheme() {
@@ -135,16 +245,22 @@ function setupEventListeners() {
   elements.step2NextBtn.addEventListener('click', () => goToStep(3));
 
   // Step 3
-  elements.detectRelationshipsBtn.addEventListener('click', detectRelationships);
-  elements.selectAllRelationships.addEventListener('change', toggleSelectAllRelationships);
+  elements.analyzeFieldsBtn.addEventListener('click', analyzeFields);
+  elements.mapPicklistsBtn.addEventListener('click', configurePicklistMappings);
   elements.step3BackBtn.addEventListener('click', () => goToStep(2));
   elements.step3NextBtn.addEventListener('click', () => goToStep(4));
 
   // Step 4
+  elements.detectRelationshipsBtn.addEventListener('click', detectRelationships);
+  elements.selectAllRelationships.addEventListener('change', toggleSelectAllRelationships);
+  elements.step4BackBtn.addEventListener('click', () => goToStep(3));
+  elements.step4NextBtn.addEventListener('click', () => goToStep(5));
+
+  // Step 5
   elements.useExternalIdCheckbox.addEventListener('change', handleExternalIdToggle);
   elements.refreshExternalIdBtn.addEventListener('click', loadExternalIdFields);
   elements.externalIdFieldSelect.addEventListener('change', handleExternalIdFieldSelection);
-  elements.step4BackBtn.addEventListener('click', () => goToStep(3));
+  elements.step5BackBtn.addEventListener('click', () => goToStep(4));
   elements.startMigrationBtn.addEventListener('click', startMigration);
   elements.exportLogBtn.addEventListener('click', exportLog);
 }
@@ -154,6 +270,12 @@ function setupEventListeners() {
 // ============================================================================
 
 function goToStep(stepNumber) {
+  // Validate step range
+  if (stepNumber < 1 || stepNumber > 5) {
+    console.error('[Record Migrator] Invalid step number:', stepNumber);
+    return;
+  }
+
   // Hide all steps
   document.querySelectorAll('.wizard-step').forEach(step => {
     step.classList.remove('active');
@@ -176,7 +298,7 @@ function goToStep(stepNumber) {
   state.currentStep = stepNumber;
 
   // Step-specific actions
-  if (stepNumber === 4) {
+  if (stepNumber === 5) {
     updateMigrationSummary();
     // Only load external ID fields if checkbox is checked and fields not already loaded
     if (elements.useExternalIdCheckbox.checked && state.externalIdFields.length === 0) {
@@ -479,7 +601,193 @@ function updateSelectedRecordCount() {
 }
 
 // ============================================================================
-// Step 3: Relationship Detection
+// Step 3: Field Mapping
+// ============================================================================
+
+async function analyzeFields() {
+  try {
+    showStatus('Analyzing field differences between orgs...', 'loading');
+
+    // Get field metadata from both orgs
+    state.sourceFields = await FieldMapper.getFieldMetadata(state.sourceSession, state.selectedObject.name);
+    state.targetFields = await FieldMapper.getFieldMetadata(state.targetSession, state.selectedObject.name);
+
+    console.log('[Record Migrator] Source fields:', state.sourceFields.length);
+    console.log('[Record Migrator] Target fields:', state.targetFields.length);
+
+    // Build field mapping
+    state.fieldMapping = FieldMapper.buildFieldMapping(state.sourceFields, state.targetFields);
+
+    // Detect picklist fields
+    state.picklistFields = PicklistMapper.detectPicklistFields(state.sourceFields, state.targetFields);
+
+    console.log('[Record Migrator] Field mapping:', state.fieldMapping);
+    console.log('[Record Migrator] Picklist fields:', state.picklistFields.length);
+
+    // Display results
+    displayFieldMapping();
+    hideStatus();
+
+    // Enable next button
+    elements.step3NextBtn.disabled = false;
+
+  } catch (error) {
+    console.error('[Record Migrator] Error analyzing fields:', error);
+    showStatus(`Error: ${error.message}`, 'error');
+  }
+}
+
+function displayFieldMapping() {
+  elements.fieldMappingPreview.classList.remove('hidden');
+
+  // Display summary
+  const totalFields = state.fieldMapping.exact.length + state.fieldMapping.compatible.length;
+  const exactMatches = state.fieldMapping.exact.length;
+  const mismatches = state.fieldMapping.compatible.length;
+  const missing = state.fieldMapping.missingInTarget.length;
+
+  elements.fieldMappingSummary.innerHTML = `
+    <div class="summary-item">
+      <span class="material-symbols-rounded status-ok">check_circle</span>
+      <span>${exactMatches} exact matches</span>
+    </div>
+    <div class="summary-item">
+      <span class="material-symbols-rounded status-warning">warning</span>
+      <span>${mismatches} type mismatches</span>
+    </div>
+    <div class="summary-item">
+      <span class="material-symbols-rounded status-error">error</span>
+      <span>${missing} missing in target</span>
+    </div>
+  `;
+
+  // Display exact matches
+  if (state.fieldMapping.exact.length > 0) {
+    elements.exactMatchesSection.classList.remove('hidden');
+    elements.exactMatchCount.textContent = state.fieldMapping.exact.length;
+
+    const matchesList = state.fieldMapping.exact.map(field =>
+      `<div class="field-item">
+        <span class="field-name">${escapeHtml(field.label)}</span>
+        <span class="field-api">${escapeHtml(field.sourceField)}</span>
+        <span class="field-type">${escapeHtml(field.type)}</span>
+      </div>`
+    ).join('');
+
+    elements.exactMatchesList.innerHTML = matchesList;
+  } else {
+    elements.exactMatchesSection.classList.add('hidden');
+  }
+
+  // Display type mismatches
+  if (state.fieldMapping.compatible.length > 0) {
+    elements.mismatchesSection.classList.remove('hidden');
+    elements.mismatchCount.textContent = state.fieldMapping.compatible.length;
+
+    const mismatchesList = state.fieldMapping.compatible.map(field =>
+      `<div class="field-item warning">
+        <span class="field-name">${escapeHtml(field.label)}</span>
+        <span class="field-api">${escapeHtml(field.sourceField)}</span>
+        <span class="field-type">${escapeHtml(field.sourceType)} → ${escapeHtml(field.targetType)}</span>
+        <span class="field-warning">${escapeHtml(field.warning)}</span>
+      </div>`
+    ).join('');
+
+    elements.mismatchesList.innerHTML = mismatchesList;
+  } else {
+    elements.mismatchesSection.classList.add('hidden');
+  }
+
+  // Display missing fields
+  if (state.fieldMapping.missingInTarget.length > 0) {
+    elements.missingFieldsSection.classList.remove('hidden');
+    elements.missingFieldCount.textContent = state.fieldMapping.missingInTarget.length;
+
+    const missingList = state.fieldMapping.missingInTarget.map(field =>
+      `<div class="field-item error">
+        <span class="field-name">${escapeHtml(field.label)}</span>
+        <span class="field-api">${escapeHtml(field.name)}</span>
+        <span class="field-type">${escapeHtml(field.type)}</span>
+        ${field.required ? '<span class="field-warning">REQUIRED</span>' : ''}
+      </div>`
+    ).join('');
+
+    elements.missingFieldsList.innerHTML = missingList;
+  } else {
+    elements.missingFieldsSection.classList.add('hidden');
+  }
+
+  // Display picklist fields
+  if (state.picklistFields.length > 0) {
+    elements.picklistSection.classList.remove('hidden');
+    elements.picklistFieldCount.textContent = state.picklistFields.length;
+
+    const picklistList = state.picklistFields.map(field => {
+      const mapping = PicklistMapper.buildPicklistMapping(field.sourceValues, field.targetValues);
+      const hasMismatches = mapping.missingInTarget.length > 0;
+
+      return `<div class="field-item ${hasMismatches ? 'warning' : ''}">
+        <span class="field-name">${escapeHtml(field.label)}</span>
+        <span class="field-api">${escapeHtml(field.name)}</span>
+        <span class="field-type">
+          ${field.sourceValues.length} values (${mapping.missingInTarget.length} missing in target)
+        </span>
+      </div>`;
+    }).join('');
+
+    elements.picklistFieldsList.innerHTML = picklistList;
+  } else {
+    elements.picklistSection.classList.add('hidden');
+  }
+}
+
+async function configurePicklistMappings() {
+  if (state.picklistFields.length === 0) {
+    showStatus('No picklist fields require mapping', 'info');
+    return;
+  }
+
+  try {
+    showStatus('Configuring picklist mappings...', 'loading');
+
+    // Build picklist mappings automatically for exact matches
+    state.picklistMappings = {};
+
+    state.picklistFields.forEach(field => {
+      const mapping = PicklistMapper.buildPicklistMapping(field.sourceValues, field.targetValues);
+
+      // Use the valueMap from the mapping (sourceValue -> targetValue)
+      state.picklistMappings[field.name] = mapping.valueMap;
+
+      // Log fields with missing values
+      if (mapping.missingInTarget.length > 0) {
+        console.warn(`[Record Migrator] Field "${field.name}" has ${mapping.missingInTarget.length} values missing in target:`,
+          mapping.missingInTarget.map(v => v.value));
+      }
+    });
+
+    console.log('[Record Migrator] Picklist mappings configured:', state.picklistMappings);
+
+    // Generate report
+    const report = PicklistMapper.generateMappingReport(state.picklistFields);
+
+    if (report.fieldsWithMismatches > 0) {
+      showStatus(
+        `Picklist mappings configured with warnings: ${report.fieldsWithMismatches} fields have value mismatches (${report.totalMissingValues} values missing in target). Records with unmapped values may fail.`,
+        'warning'
+      );
+    } else {
+      showStatus('Picklist mappings configured successfully - all values match!', 'success');
+    }
+
+  } catch (error) {
+    console.error('[Record Migrator] Error configuring picklist mappings:', error);
+    showStatus(`Error: ${error.message}`, 'error');
+  }
+}
+
+// ============================================================================
+// Step 4: Relationship Detection
 // ============================================================================
 
 async function detectRelationships() {
@@ -603,7 +911,7 @@ function toggleSelectAllRelationships(event) {
 }
 
 // ============================================================================
-// Step 4: Migration Summary & Execution
+// Step 5: Migration Summary & Execution
 // ============================================================================
 
 function updateMigrationSummary() {
@@ -637,6 +945,7 @@ async function startMigration() {
 
   state.migrationInProgress = true;
   state.migrationLog = [];
+  state.migrationResults = null; // Store results for potential rollback
 
   // Show progress UI
   elements.migrationProgress.classList.remove('hidden');
@@ -644,8 +953,27 @@ async function startMigration() {
   elements.startMigrationBtn.disabled = true;
   elements.step4BackBtn.disabled = true;
 
+  // Reset progress
+  updateProgress(0, 'Initializing migration...');
+
   try {
     appendLog('info', 'Migration started...');
+
+    // Apply field mapping validation
+    if (state.fieldMapping) {
+      const validation = FieldMapper.validateFieldMapping(state.fieldMapping, state.sourceFields, state.targetFields);
+
+      if (!validation.valid) {
+        throw new Error(`Field mapping validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        appendLog('warning', `Field mapping warnings: ${validation.warnings.length} issues detected`);
+        validation.warnings.forEach(warning => {
+          console.warn('[Record Migrator]', warning);
+        });
+      }
+    }
 
     const response = await chrome.runtime.sendMessage({
       action: 'MIGRATE_RECORDS',
@@ -661,7 +989,9 @@ async function startMigration() {
         objectName: state.selectedObject.name,
         recordIds: state.selectedRecords,
         relationships: state.selectedRelationships,
-        externalIdField: state.useExternalId && state.selectedExternalIdField ? state.selectedExternalIdField.name : null
+        externalIdField: state.useExternalId && state.selectedExternalIdField ? state.selectedExternalIdField.name : null,
+        fieldMapping: state.fieldMapping,
+        picklistMappings: state.picklistMappings
       }
     });
 
@@ -669,28 +999,561 @@ async function startMigration() {
       throw new Error(response.error || 'Migration failed');
     }
 
+    // Store results for potential rollback
+    state.migrationResults = response.data;
+
     appendLog('success', `Migration completed successfully!`);
     appendLog('info', `Parent records created: ${response.data.parentSuccess || 0}`);
+    appendLog('info', `Parent records failed: ${response.data.parentFailed || 0}`);
     appendLog('info', `Child records created: ${response.data.childSuccess || 0}`);
+    appendLog('info', `Child records failed: ${response.data.childFailed || 0}`);
 
+    // Display detailed errors if any
+    if (response.data.detailedErrors && response.data.detailedErrors.length > 0) {
+      appendLog('warning', `Encountered ${response.data.detailedErrors.length} errors during migration`);
+      displayDetailedErrors(response.data.detailedErrors);
+    }
+
+    // Legacy error display
     if (response.data.errors && response.data.errors.length > 0) {
-      appendLog('warning', `Errors: ${response.data.errors.length}`);
       response.data.errors.forEach(err => appendLog('error', err));
     }
 
-    showStatus('Migration completed successfully!', 'success');
+    // Show rollback button if there were failures
+    const totalFailures = (response.data.parentFailed || 0) + (response.data.childFailed || 0);
+    if (totalFailures > 0 && response.data.createdRecordIds && response.data.createdRecordIds.length > 0) {
+      showRollbackButton();
+    }
+
+    showStatus('Migration completed!', totalFailures > 0 ? 'warning' : 'success');
     updateProgress(100, 'Migration complete');
     elements.exportLogBtn.disabled = false;
+
+    // Display migration report with all created record IDs
+    if (response.data.createdRecordIds && response.data.createdRecordIds.length > 0) {
+      displayMigrationReport(response.data);
+    }
+
+    // Disable navigation buttons after successful migration
+    elements.startMigrationBtn.disabled = true;
+    elements.step5BackBtn.disabled = true;
 
   } catch (error) {
     console.error('[Record Migrator] Migration error:', error);
     appendLog('error', `Migration failed: ${error.message}`);
     showStatus(`Migration failed: ${error.message}`, 'error');
     updateProgress(0, 'Migration failed');
+    // Re-enable buttons on error so user can retry
+    elements.startMigrationBtn.disabled = false;
+    elements.step5BackBtn.disabled = false;
   } finally {
     state.migrationInProgress = false;
-    elements.startMigrationBtn.disabled = false;
-    elements.step4BackBtn.disabled = false;
+  }
+}
+
+/**
+ * Display detailed errors grouped by category
+ * @param {Array} detailedErrors - Array of detailed error objects
+ */
+function displayDetailedErrors(detailedErrors) {
+  // Group errors by code
+  const errorGroups = {};
+  detailedErrors.forEach(error => {
+    const code = error.code || 'UNKNOWN_ERROR';
+    if (!errorGroups[code]) {
+      errorGroups[code] = [];
+    }
+    errorGroups[code].push(error);
+  });
+
+  // Display grouped errors
+  Object.keys(errorGroups).forEach(code => {
+    const errors = errorGroups[code];
+    appendLog('error', `${getErrorCategoryLabel(code)} (${errors.length} records):`);
+
+    // Show first 5 errors in each category
+    errors.slice(0, 5).forEach(error => {
+      appendLog('error', `  - Record ${error.recordId}: ${error.message}`);
+    });
+
+    if (errors.length > 5) {
+      appendLog('error', `  ... and ${errors.length - 5} more`);
+    }
+  });
+}
+
+/**
+ * Get human-readable label for error category
+ * @param {string} code - Error code
+ * @returns {string} Human-readable label
+ */
+function getErrorCategoryLabel(code) {
+  const labels = {
+    'REQUIRED_FIELD_MISSING': 'Required Field Missing',
+    'FIELD_TYPE_MISMATCH': 'Field Type Mismatch',
+    'VALIDATION_RULE_FAILED': 'Validation Rule Failed',
+    'LOOKUP_NOT_FOUND': 'Lookup Record Not Found',
+    'API_LIMIT_EXCEEDED': 'API Limit Exceeded',
+    'PERMISSION_DENIED': 'Permission Denied',
+    'DUPLICATE_VALUE': 'Duplicate Value',
+    'RELATIONSHIP_MIGRATION_FAILED': 'Child Relationship Migration Failed',
+    'UNKNOWN_ERROR': 'Unknown Error'
+  };
+  return labels[code] || code;
+}
+
+/**
+ * Display migration report with all created record IDs
+ * @param {Object} migrationData - Migration results data
+ */
+function displayMigrationReport(migrationData) {
+  const { createdRecordIds, parentSuccess, childSuccess, migratedRecords } = migrationData;
+
+  // Create report container if it doesn't exist
+  let reportContainer = document.getElementById('migrationReport');
+  if (!reportContainer) {
+    reportContainer = document.createElement('div');
+    reportContainer.id = 'migrationReport';
+    reportContainer.className = 'migration-report';
+
+    // Insert after the log container
+    const logContainer = elements.migrationLog.parentElement;
+    logContainer.parentElement.insertBefore(reportContainer, logContainer.nextSibling);
+  }
+
+  // Build report content
+  const targetOrgUrl = state.targetSession?.instanceUrl || '';
+  const sourceOrgUrl = state.sourceSession?.instanceUrl || '';
+  const totalRecords = migratedRecords?.length || createdRecordIds?.length || 0;
+
+  let reportHTML = `
+    <div class="report-header">
+      <h3>
+        <span class="material-symbols-rounded">summarize</span>
+        Migration Report
+      </h3>
+      <span class="record-count">${totalRecords} records created</span>
+    </div>
+    <div class="report-content">
+      <div class="report-section">
+        <h4>Migrated Records</h4>
+        <p class="report-description">Click any ID to open the record in Salesforce</p>
+        <div class="record-id-list">
+  `;
+
+  // Use migratedRecords if available (contains full record data with Name)
+  if (migratedRecords && migratedRecords.length > 0) {
+    reportHTML += `
+          <table class="id-mapping-table">
+            <thead>
+              <tr>
+                <th>Record Name</th>
+                <th>Source Record ID</th>
+                <th>Target Record ID</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    migratedRecords.forEach(({ sourceId, targetId, name }) => {
+      const sourceUrl = `${sourceOrgUrl}/${sourceId}`;
+      const targetUrl = `${targetOrgUrl}/${targetId}`;
+      reportHTML += `
+              <tr>
+                <td class="record-name">${escapeHtml(name || 'N/A')}</td>
+                <td>
+                  <a href="${sourceUrl}" target="_blank" class="record-link">
+                    <code>${sourceId}</code>
+                    <span class="material-symbols-rounded">open_in_new</span>
+                  </a>
+                </td>
+                <td>
+                  <a href="${targetUrl}" target="_blank" class="record-link">
+                    <code>${targetId}</code>
+                    <span class="material-symbols-rounded">open_in_new</span>
+                  </a>
+                </td>
+              </tr>
+      `;
+    });
+
+    reportHTML += `
+            </tbody>
+          </table>
+    `;
+  } else if (createdRecordIds && createdRecordIds.length > 0) {
+    // Fallback: Simple list of created IDs
+    createdRecordIds.forEach(id => {
+      const targetUrl = `${targetOrgUrl}/${id}`;
+      reportHTML += `
+          <div class="record-id-item">
+            <a href="${targetUrl}" target="_blank" class="record-link">
+              <code>${id}</code>
+              <span class="material-symbols-rounded">open_in_new</span>
+            </a>
+          </div>
+      `;
+    });
+  } else {
+    reportHTML += `<p class="empty-message">No records were created.</p>`;
+  }
+
+  reportHTML += `
+        </div>
+      </div>
+      <div class="report-actions">
+        <button id="copyReportBtn" class="btn btn-secondary btn-sm">
+          <span class="material-symbols-rounded">content_copy</span>
+          Copy All IDs
+        </button>
+        <button id="exportCsvBtn" class="btn btn-secondary btn-sm">
+          <span class="material-symbols-rounded">csv</span>
+          Export CSV
+        </button>
+        <button id="exportExcelBtn" class="btn btn-primary btn-sm">
+          <span class="material-symbols-rounded">table_view</span>
+          Export Excel
+        </button>
+      </div>
+    </div>
+  `;
+
+  reportContainer.innerHTML = reportHTML;
+
+  // Add event listeners for report actions
+  document.getElementById('copyReportBtn').addEventListener('click', () => {
+    let idsText;
+    if (migratedRecords && migratedRecords.length > 0) {
+      idsText = migratedRecords.map(r => `${r.name}\t${r.sourceId}\t${r.targetId}`).join('\n');
+    } else {
+      idsText = createdRecordIds.join('\n');
+    }
+    navigator.clipboard.writeText(idsText).then(() => {
+      showStatus('Record data copied to clipboard!', 'success');
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+      showStatus('Failed to copy to clipboard', 'error');
+    });
+  });
+
+  document.getElementById('exportCsvBtn').addEventListener('click', () => {
+    exportMigrationReportCSV(migrationData);
+  });
+
+  document.getElementById('exportExcelBtn').addEventListener('click', () => {
+    exportMigrationReportExcel(migrationData);
+  });
+}
+
+/**
+ * Escape HTML special characters
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Export migration report as CSV
+ * @param {Object} migrationData - Migration results data
+ */
+function exportMigrationReportCSV(migrationData) {
+  const { createdRecordIds, migratedRecords, parentSuccess, childSuccess } = migrationData;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const objectName = state.selectedObject?.name || 'records';
+
+  let csvContent = 'Record Name,Source Record ID,Target Record ID,Status\n';
+
+  if (migratedRecords && migratedRecords.length > 0) {
+    migratedRecords.forEach(({ sourceId, targetId, name }) => {
+      // Escape CSV values that contain commas or quotes
+      const escapedName = name ? `"${name.replace(/"/g, '""')}"` : '';
+      csvContent += `${escapedName},${sourceId},${targetId},Created\n`;
+    });
+  } else if (createdRecordIds) {
+    createdRecordIds.forEach(id => {
+      csvContent += `,,${id},Created\n`;
+    });
+  }
+
+  // Add summary
+  csvContent += `\nSummary\n`;
+  csvContent += `Total Records Created,${migratedRecords?.length || createdRecordIds?.length || 0}\n`;
+  csvContent += `Parent Records,${parentSuccess || 0}\n`;
+  csvContent += `Child Records,${childSuccess || 0}\n`;
+  csvContent += `Migration Date,${new Date().toISOString()}\n`;
+  csvContent += `Source Org,${state.sourceSession?.instanceUrl || ''}\n`;
+  csvContent += `Target Org,${state.targetSession?.instanceUrl || ''}\n`;
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `migration-report-${objectName}-${timestamp}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+
+  appendLog('info', `Migration report exported: migration-report-${objectName}-${timestamp}.csv`);
+}
+
+/**
+ * Export migration report as Excel with two tabs
+ * Tab 1: Summary - Migration summary information
+ * Tab 2: Records - All migrated records with full field data
+ * @param {Object} migrationData - Migration results data
+ */
+function exportMigrationReportExcel(migrationData) {
+  const { migratedRecords, parentSuccess, childSuccess, createdRecordIds } = migrationData;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const objectName = state.selectedObject?.name || 'records';
+  const fileName = `migration-report-${objectName}-${timestamp}.xlsx`;
+
+  // Escape XML special characters
+  const escapeXml = (str) => {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
+
+  // Build Summary sheet data
+  const summaryData = [
+    ['Migration Report Summary'],
+    [''],
+    ['Property', 'Value'],
+    ['Object', objectName],
+    ['Total Records Created', migratedRecords?.length || createdRecordIds?.length || 0],
+    ['Parent Records', parentSuccess || 0],
+    ['Child Records', childSuccess || 0],
+    ['Migration Date', new Date().toLocaleString()],
+    ['Source Org', state.sourceSession?.instanceUrl || ''],
+    ['Target Org', state.targetSession?.instanceUrl || ''],
+    [''],
+    ['ID Mapping'],
+    ['Record Name', 'Source Record ID', 'Target Record ID']
+  ];
+
+  // Add ID mapping rows
+  if (migratedRecords && migratedRecords.length > 0) {
+    migratedRecords.forEach(({ sourceId, targetId, name }) => {
+      summaryData.push([name || 'N/A', sourceId, targetId]);
+    });
+  }
+
+  // Build Records sheet data with all fields
+  let recordsData = [];
+  if (migratedRecords && migratedRecords.length > 0 && migratedRecords[0].record) {
+    // Get all field names from the first record
+    const allFields = Object.keys(migratedRecords[0].record);
+
+    // Header row: Source ID, Target ID, Name, then all other fields
+    const headerRow = ['Source Record ID', 'Target Record ID', 'Record Name', ...allFields];
+    recordsData.push(headerRow);
+
+    // Data rows
+    migratedRecords.forEach(({ sourceId, targetId, name, record }) => {
+      const row = [sourceId, targetId, name || 'N/A'];
+      allFields.forEach(field => {
+        let value = record[field];
+        // Handle object values (like attributes)
+        if (typeof value === 'object' && value !== null) {
+          value = JSON.stringify(value);
+        }
+        row.push(value ?? '');
+      });
+      recordsData.push(row);
+    });
+  } else {
+    recordsData = [
+      ['Target Record ID'],
+      ...(createdRecordIds || []).map(id => [id])
+    ];
+  }
+
+  // Generate Excel XML (SpreadsheetML format - works without external library)
+  const generateSheetXml = (data) => {
+    let xml = '';
+    data.forEach((row, rowIndex) => {
+      xml += '<Row ss:Index="' + (rowIndex + 1) + '">';
+      row.forEach((cell, cellIndex) => {
+        const cellType = typeof cell === 'number' ? 'Number' : 'String';
+        xml += `<Cell ss:Index="${cellIndex + 1}"><Data ss:Type="${cellType}">${escapeXml(cell)}</Data></Cell>`;
+      });
+      xml += '</Row>\n';
+    });
+    return xml;
+  };
+
+  const excelXml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:x2="http://schemas.microsoft.com/office/excel/2003/xml">
+  <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+    <Title>Migration Report</Title>
+    <Author>Salesforce Picklist Manager</Author>
+  </DocumentProperties>
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Bottom"/>
+      <Borders/>
+      <Font/>
+      <Interior/>
+      <NumberFormat/>
+      <Protection/>
+    </Style>
+    <Style ss:ID="Header">
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+      <Font ss:Bold="1" ss:Color="FFFFFF" ss:Size="11"/>
+      <Interior ss:Color="6B3FA0" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="Summary">
+    <Table ss:ExpandedColumnCount="${Math.max(...summaryData.map(r => r.length))}" ss:ExpandedRowCount="${summaryData.length}">
+      ${generateSheetXml(summaryData)}
+    </Table>
+    <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+      <PageSetup>
+        <Header x:Margin="0.5"/>
+        <Footer x:Margin="0.5"/>
+        <PageMargins x:Bottom="0.75" x:Left="0.7" x:Right="0.7" x:Top="0.75"/>
+      </PageSetup>
+      <Print>
+        <ValidPrinterInfo/>
+        <HorizontalResolution>300</HorizontalResolution>
+        <VerticalResolution>300</VerticalResolution>
+      </Print>
+      <Selected/>
+      <Panes>
+        <Pane>
+          <Number>3</Number>
+        </Pane>
+      </Panes>
+      <ProtectObjects>False</ProtectObjects>
+      <ProtectScenarios>False</ProtectScenarios>
+    </WorksheetOptions>
+  </Worksheet>
+  <Worksheet ss:Name="All Records">
+    <Table ss:ExpandedColumnCount="${Math.max(...recordsData.map(r => r.length))}" ss:ExpandedRowCount="${recordsData.length}">
+      ${generateSheetXml(recordsData)}
+    </Table>
+    <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+      <PageSetup>
+        <Header x:Margin="0.5"/>
+        <Footer x:Margin="0.5"/>
+        <PageMargins x:Bottom="0.75" x:Left="0.7" x:Right="0.7" x:Top="0.75"/>
+      </PageSetup>
+      <Print>
+        <ValidPrinterInfo/>
+        <HorizontalResolution>300</HorizontalResolution>
+        <VerticalResolution>300</VerticalResolution>
+      </Print>
+      <Selected/>
+      <Panes>
+        <Pane>
+          <Number>3</Number>
+        </Pane>
+      </Panes>
+      <ProtectObjects>False</ProtectObjects>
+      <ProtectScenarios>False</ProtectScenarios>
+    </WorksheetOptions>
+  </Worksheet>
+</Workbook>`;
+
+  // Download the file using correct MIME type
+  const blob = new Blob([excelXml], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(link.href);
+
+  appendLog('info', `Migration report exported: ${fileName}`);
+}
+
+/**
+ * Show rollback button
+ */
+function showRollbackButton() {
+  // Check if rollback button already exists
+  if (document.getElementById('rollbackBtn')) {
+    return;
+  }
+
+  const rollbackBtn = document.createElement('button');
+  rollbackBtn.id = 'rollbackBtn';
+  rollbackBtn.className = 'btn btn-secondary';
+  rollbackBtn.innerHTML = `
+    <span class="material-symbols-rounded">undo</span>
+    Rollback Migration
+  `;
+  rollbackBtn.addEventListener('click', rollbackMigration);
+
+  // Insert after start migration button
+  elements.startMigrationBtn.parentNode.insertBefore(rollbackBtn, elements.startMigrationBtn.nextSibling);
+}
+
+/**
+ * Rollback migration by deleting created records
+ */
+async function rollbackMigration() {
+  if (!state.migrationResults || !state.migrationResults.createdRecordIds || state.migrationResults.createdRecordIds.length === 0) {
+    showStatus('No records to rollback', 'warning');
+    return;
+  }
+
+  const confirmed = confirm(
+    `This will delete ${state.migrationResults.createdRecordIds.length} records that were created during migration.\n\n` +
+    `This action cannot be undone. Continue?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    appendLog('info', `Starting rollback of ${state.migrationResults.createdRecordIds.length} records...`);
+    updateProgress(0, 'Rolling back migration...');
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'ROLLBACK_MIGRATION',
+      targetSession: {
+        sessionId: state.targetSession.sessionId,
+        instanceUrl: state.targetSession.instanceUrl
+      },
+      recordIds: state.migrationResults.createdRecordIds
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Rollback failed');
+    }
+
+    appendLog('success', `Rollback completed!`);
+    appendLog('info', `Records deleted: ${response.data.success || 0}`);
+    appendLog('info', `Deletions failed: ${response.data.failed || 0}`);
+
+    if (response.data.errors && response.data.errors.length > 0) {
+      appendLog('warning', `Rollback errors: ${response.data.errors.length}`);
+      response.data.errors.slice(0, 10).forEach(err => appendLog('error', err));
+    }
+
+    showStatus('Rollback completed!', 'success');
+    updateProgress(100, 'Rollback complete');
+
+    // Remove rollback button
+    const rollbackBtn = document.getElementById('rollbackBtn');
+    if (rollbackBtn) {
+      rollbackBtn.remove();
+    }
+
+  } catch (error) {
+    console.error('[Record Migrator] Rollback error:', error);
+    appendLog('error', `Rollback failed: ${error.message}`);
+    showStatus(`Rollback failed: ${error.message}`, 'error');
   }
 }
 
@@ -844,8 +1707,16 @@ function resetMigration() {
   state.selectedObject = null;
   state.selectedRecords = [];
   state.allRecords = [];
+  state.sourceFields = [];
+  state.targetFields = [];
+  state.fieldMapping = null;
+  state.picklistFields = [];
+  state.picklistMappings = {};
   state.childRelationships = [];
   state.selectedRelationships = [];
+  state.externalIdFields = [];
+  state.selectedExternalIdField = null;
+  state.useExternalId = true;
   state.migrationLog = [];
   state.migrationInProgress = false;
 
@@ -857,10 +1728,13 @@ function resetMigration() {
   elements.objectSelect.value = '';
   elements.soqlWhere.value = '';
   elements.recordsPreview.classList.add('hidden');
+  elements.fieldMappingPreview.classList.add('hidden');
   elements.relationshipsPreview.classList.add('hidden');
   elements.migrationProgress.classList.add('hidden');
   elements.migrationLogContainer.classList.add('hidden');
   elements.migrationLog.innerHTML = '';
+  elements.useExternalIdCheckbox.checked = true;
+  elements.externalIdFieldContainer.classList.remove('hidden');
 
   // Go to step 1
   goToStep(1);
@@ -878,12 +1752,6 @@ function showStatus(message, type = 'info') {
 
 function hideStatus() {
   elements.statusMessage.className = 'status-message';
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // ============================================================================

@@ -28,10 +28,31 @@ let previewData = null;
 // Global state for current page context
 let currentPageContext = null;
 
+// Locked feature unlock state
+let isRecordMigratorUnlocked = false;
+let isShareFilesUnlocked = false;
+
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize theme first for smooth UX
   await ThemeManager.initTheme();
+
+  // Check for stored unlock status
+  try {
+    const stored = await chrome.storage.session.get(['recordMigratorUnlocked', 'shareFilesUnlocked']);
+    if (stored.recordMigratorUnlocked) {
+      isRecordMigratorUnlocked = true;
+      const lockIcon = document.querySelector('#recordMigratorBtn .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+    }
+    if (stored.shareFilesUnlocked) {
+      isShareFilesUnlocked = true;
+      const lockIcon = document.querySelector('#checkShareFilesBtn .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+    }
+  } catch (error) {
+    console.warn('[Popup] Could not check unlock status:', error);
+  }
 
   // Display version from manifest
   displayVersion();
@@ -175,6 +196,14 @@ function setupEventListeners() {
 
   // Approval Process view buttons
   document.getElementById('backFromApprovalProcessBtn').addEventListener('click', showMainView);
+
+  // Record Migrator unlock view buttons
+  document.getElementById('backFromRecordMigratorUnlockBtn')?.addEventListener('click', showMainView);
+  document.getElementById('unlockRecordMigratorBtn')?.addEventListener('click', unlockRecordMigrator);
+
+  // Share Files unlock view buttons
+  document.getElementById('backFromShareFilesUnlockBtn')?.addEventListener('click', showMainView);
+  document.getElementById('unlockShareFilesBtn')?.addEventListener('click', unlockShareFiles);
 }
 
 //Handler for new unified Picklist Management page
@@ -1962,6 +1991,12 @@ function handleOrgCompare() {
 }
 
 function handleRecordMigrator() {
+  // Check if feature is unlocked
+  if (!isRecordMigratorUnlocked) {
+    showRecordMigratorUnlockView();
+    return;
+  }
+
   try {
     console.log('[Popup] Opening Record Migrator...');
 
@@ -1974,6 +2009,62 @@ function handleRecordMigrator() {
   } catch (error) {
     console.error('[Popup] Failed to open Record Migrator:', error);
     alert(`Failed to open Record Migrator: ${error.message}`);
+  }
+}
+
+function showRecordMigratorUnlockView() {
+  document.getElementById('mainView').classList.add('hidden');
+  document.getElementById('recordMigratorUnlockView').classList.remove('hidden');
+  document.getElementById('recordMigratorPassword').focus();
+}
+
+async function unlockRecordMigrator() {
+  const password = document.getElementById('recordMigratorPassword').value;
+  const statusEl = document.getElementById('recordMigratorUnlockStatus');
+  const unlockBtn = document.getElementById('unlockRecordMigratorBtn');
+
+  if (!password) {
+    statusEl.textContent = 'Please enter a password';
+    statusEl.className = 'status-message error';
+    return;
+  }
+
+  try {
+    unlockBtn.disabled = true;
+    statusEl.textContent = 'Validating...';
+    statusEl.className = 'status-message loading';
+
+    // Use the same password as other locked features
+    const validKey = 'DOT-DEPS-2024';
+
+    if (password === validKey) {
+      isRecordMigratorUnlocked = true;
+      await chrome.storage.session.set({ recordMigratorUnlocked: true });
+
+      statusEl.textContent = 'Unlocked successfully!';
+      statusEl.className = 'status-message success';
+
+      // Remove lock icon from button
+      const lockIcon = document.querySelector('#recordMigratorBtn .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+
+      setTimeout(() => {
+        document.getElementById('recordMigratorPassword').value = '';
+        statusEl.textContent = '';
+        showMainView();
+
+        // Now open Record Migrator
+        const recordMigratorUrl = chrome.runtime.getURL('pages/record-migrator/record-migrator.html');
+        chrome.tabs.create({ url: recordMigratorUrl });
+      }, 1000);
+    } else {
+      throw new Error('Invalid password');
+    }
+  } catch (error) {
+    console.error('[Popup] Record Migrator unlock failed:', error);
+    statusEl.textContent = 'Invalid password. Access denied.';
+    statusEl.className = 'status-message error';
+    unlockBtn.disabled = false;
   }
 }
 
@@ -2047,6 +2138,12 @@ async function updateCheckShareFilesButton() {
 }
 
 async function handleCheckShareFiles() {
+  // Check if feature is unlocked
+  if (!isShareFilesUnlocked) {
+    showShareFilesUnlockView();
+    return;
+  }
+
   try {
     if (!currentPageContext || !currentPageContext.recordId) {
       alert('Error: No record context available');
@@ -2118,6 +2215,61 @@ async function handleCheckShareFiles() {
         Error: ${escapeHtml(error.message)}
       </div>
     `;
+  }
+}
+
+function showShareFilesUnlockView() {
+  document.getElementById('mainView').classList.add('hidden');
+  document.getElementById('shareFilesUnlockView').classList.remove('hidden');
+  document.getElementById('shareFilesPassword').focus();
+}
+
+async function unlockShareFiles() {
+  const password = document.getElementById('shareFilesPassword').value;
+  const statusEl = document.getElementById('shareFilesUnlockStatus');
+  const unlockBtn = document.getElementById('unlockShareFilesBtn');
+
+  if (!password) {
+    statusEl.textContent = 'Please enter a password';
+    statusEl.className = 'status-message error';
+    return;
+  }
+
+  try {
+    unlockBtn.disabled = true;
+    statusEl.textContent = 'Validating...';
+    statusEl.className = 'status-message loading';
+
+    // Use the same password as other locked features
+    const validKey = 'DOT-DEPS-2024';
+
+    if (password === validKey) {
+      isShareFilesUnlocked = true;
+      await chrome.storage.session.set({ shareFilesUnlocked: true });
+
+      statusEl.textContent = 'Unlocked successfully!';
+      statusEl.className = 'status-message success';
+
+      // Remove lock icon from button
+      const lockIcon = document.querySelector('#checkShareFilesBtn .lock-icon');
+      if (lockIcon) lockIcon.style.display = 'none';
+
+      setTimeout(() => {
+        document.getElementById('shareFilesPassword').value = '';
+        statusEl.textContent = '';
+        showMainView();
+
+        // Now trigger the actual share files check
+        handleCheckShareFiles();
+      }, 1000);
+    } else {
+      throw new Error('Invalid password');
+    }
+  } catch (error) {
+    console.error('[Popup] Share Files unlock failed:', error);
+    statusEl.textContent = 'Invalid password. Access denied.';
+    statusEl.className = 'status-message error';
+    unlockBtn.disabled = false;
   }
 }
 
