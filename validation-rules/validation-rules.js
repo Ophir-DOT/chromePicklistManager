@@ -77,12 +77,35 @@ class ValidationRulesManager {
       if (session && session.instanceUrl) {
         const hostname = new URL(session.instanceUrl).hostname;
         document.getElementById('orgUrl').textContent = hostname;
+        // Store instance URL for link generation
+        this.instanceUrl = session.instanceUrl;
       } else {
         document.getElementById('orgUrl').textContent = 'Not connected';
       }
     } catch (error) {
       console.error('[ValidationRulesManager] Error loading org info:', error);
       document.getElementById('orgUrl').textContent = 'Error loading';
+    }
+  }
+
+  generateRuleLink(rule) {
+    // Generate Salesforce Setup link for validation rule
+    // Lightning format: {instanceUrl}/lightning/setup/ObjectManager/{ObjectApiName}/ValidationRules/{ValidationRuleId}/view
+    // Classic fallback: {instanceUrl}/{ValidationRuleId}
+
+    if (!this.instanceUrl) {
+      // Fallback to just the rule ID if we don't have instance URL
+      return `#${rule.Id}`;
+    }
+
+    const objectApiName = rule.ObjectApiName || rule.EntityDefinitionId;
+
+    if (objectApiName && objectApiName !== rule.EntityDefinitionId) {
+      // Use Lightning Experience URL
+      return `${this.instanceUrl}/lightning/setup/ObjectManager/${encodeURIComponent(objectApiName)}/ValidationRules/${rule.Id}/view`;
+    } else {
+      // Fallback to Classic URL
+      return `${this.instanceUrl}/${rule.Id}`;
     }
   }
 
@@ -325,6 +348,9 @@ class ValidationRulesManager {
               <span class="material-symbols-rounded">${formatted.active ? 'check_circle' : 'cancel'}</span>
               ${formatted.active ? 'Active' : 'Inactive'}
             </span>
+            <a href="${this.generateRuleLink(rule)}" target="_blank" class="rule-action-btn rule-link-btn" title="Open in Salesforce Setup">
+              <span class="material-symbols-rounded">open_in_new</span>
+            </a>
             <button class="rule-action-btn" data-action="view" data-id="${rule.Id}" title="View Details">
               <span class="material-symbols-rounded">visibility</span>
             </button>

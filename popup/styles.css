@@ -251,6 +251,93 @@ main {
   opacity: 1;
 }
 
+/* Unlock Content (for password-protected features) */
+.unlock-content {
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.unlock-content .lock-icon-large {
+  margin-bottom: var(--spacing-lg);
+}
+
+.unlock-content .lock-icon-large .material-symbols-rounded {
+  font-size: 64px;
+  color: var(--brand-color-neutral-med);
+}
+
+.unlock-content p {
+  font-size: var(--font-size-base);
+  color: var(--brand-color-text-muted);
+  margin-bottom: var(--spacing-lg);
+}
+
+.unlock-content .form-group {
+  max-width: 300px;
+  margin: 0 auto var(--spacing-lg) auto;
+  text-align: left;
+}
+
+.unlock-content .form-group label {
+  display: block;
+  font-family: var(--font-family-headline);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--brand-color-text-dark);
+  margin-bottom: var(--spacing-xs);
+}
+
+.unlock-content .form-group input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: var(--border-width-thin) solid var(--brand-color-neutral-med);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-base);
+}
+
+.unlock-content .form-group input:focus {
+  outline: none;
+  border-color: var(--brand-color-cta);
+  box-shadow: 0 0 0 3px rgba(221, 0, 135, 0.1);
+}
+
+.unlock-content .action-button.primary {
+  background: var(--brand-color-cta);
+  color: white;
+  border-color: var(--brand-color-cta);
+  justify-content: center;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.unlock-content .action-button.primary:hover {
+  background: var(--brand-color-cta-hover);
+  border-color: var(--brand-color-cta-hover);
+}
+
+.unlock-content .action-button.primary .icon {
+  color: white;
+}
+
+.unlock-content .status-message {
+  margin-top: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  min-height: 20px;
+}
+
+.unlock-content .status-message.error {
+  color: var(--color-error);
+}
+
+.unlock-content .status-message.success {
+  color: var(--color-success);
+}
+
+.unlock-content .status-message.loading {
+  color: var(--brand-color-neutral-med);
+}
+
 /* Section Divider */
 .section-divider {
   display: flex;
@@ -1360,4 +1447,45 @@ footer {
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: var(--brand-color-primary);
+}
+
+/* ============================================
+   APPROVAL PROCESS STATUS BADGES
+   ============================================ */
+
+.status-approved {
+  background: #d4edda !important;
+  color: #155724 !important;
+  border: 1px solid #c3e6cb !important;
+}
+
+.status-pending {
+  background: #fff3cd !important;
+  color: #856404 !important;
+  border: 1px solid #ffeaa7 !important;
+}
+
+.status-rejected {
+  background: #f8d7da !important;
+  color: #721c24 !important;
+  border: 1px solid #f5c6cb !important;
+}
+
+/* Dark mode status badges */
+[data-theme="dark"] .status-approved {
+  background: rgba(40, 167, 69, 0.2) !important;
+  color: #4caf50 !important;
+  border-color: rgba(40, 167, 69, 0.4) !important;
+}
+
+[data-theme="dark"] .status-pending {
+  background: rgba(255, 193, 7, 0.2) !important;
+  color: #ffc107 !important;
+  border-color: rgba(255, 193, 7, 0.4) !important;
+}
+
+[data-theme="dark"] .status-rejected {
+  background: rgba(220, 53, 69, 0.2) !important;
+  color: #f44336 !important;
+  border-color: rgba(220, 53, 69, 0.4) !important;
 }

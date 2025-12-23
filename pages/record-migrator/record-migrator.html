@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Record Migrator - Salesforce Picklist Manager</title>
+  <link rel="stylesheet" href="../../popup/design-tokens.css">
+  <link rel="stylesheet" href="record-migrator.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+</head>
+<body>
+  <!-- Unlock Gate (shown when feature is locked) -->
+  <div id="unlockGate" class="unlock-gate">
+    <div class="unlock-content">
+      <div class="lock-icon-large">
+        <span class="material-symbols-rounded">lock</span>
+      </div>
+      <h2>Record Migrator 🔒</h2>
+      <p>This feature is password-protected. Enter the password to unlock.</p>
+      <div class="form-group">
+        <label for="pagePassword">Password:</label>
+        <input type="password" id="pagePassword" placeholder="Enter password">
+      </div>
+      <button id="unlockPageBtn" class="btn btn-primary">
+        <span class="material-symbols-rounded">lock_open</span>
+        Unlock
+      </button>
+      <div id="pageUnlockStatus" class="status-message"></div>
+    </div>
+  </div>
+
+  <div id="mainContent" class="container hidden">
+    <!-- Header -->
+    <header class="header">
+      <button id="backBtn" class="back-button" title="Back to Popup">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </button>
+      <h1>
+        <span class="material-symbols-rounded">sync_alt</span>
+        Record Migrator
+      </h1>
+    </header>
+
+    <!-- Progress Indicator -->
+    <div class="wizard-progress">
+      <div class="progress-step active" data-step="1">
+        <div class="step-number">1</div>
+        <div class="step-label">Orgs</div>
+      </div>
+      <div class="progress-step" data-step="2">
+        <div class="step-number">2</div>
+        <div class="step-label">Records</div>
+      </div>
+      <div class="progress-step" data-step="3">
+        <div class="step-number">3</div>
+        <div class="step-label">Field Mapping</div>
+      </div>
+      <div class="progress-step" data-step="4">
+        <div class="step-number">4</div>
+        <div class="step-label">Relationships</div>
+      </div>
+      <div class="progress-step" data-step="5">
+        <div class="step-number">5</div>
+        <div class="step-label">Migration</div>
+      </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="statusMessage" class="status-message"></div>
+
+    <!-- Step 1: Org Selection -->
+    <div class="wizard-step active" id="step1">
+      <h2>Step 1: Select Source and Target Orgs</h2>
+      <p class="step-description">Choose the Salesforce orgs for migration. Make sure both orgs are open in separate tabs.</p>
+
+      <div class="org-selection-container">
+        <div class="org-selector">
+          <label for="sourceOrgSelect">
+            <span class="material-symbols-rounded">cloud_download</span>
+            Source Org (data will be copied from here)
+          </label>
+          <select id="sourceOrgSelect" class="org-select">
+            <option value="">-- Select Source Org --</option>
+          </select>
+          <div id="sourceOrgInfo" class="org-info"></div>
+        </div>
+
+        <div class="org-selector">
+          <label for="targetOrgSelect">
+            <span class="material-symbols-rounded">cloud_upload</span>
+            Target Org (data will be copied to here)
+          </label>
+          <select id="targetOrgSelect" class="org-select">
+            <option value="">-- Select Target Org --</option>
+          </select>
+          <div id="targetOrgInfo" class="org-info"></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="step1NextBtn" class="btn btn-primary" disabled>
+          Next: Select Records
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: Record Selection -->
+    <div class="wizard-step" id="step2">
+      <h2>Step 2: Select Records to Migrate</h2>
+      <p class="step-description">Choose the object and records you want to migrate.</p>
+
+      <div class="record-selection-container">
+        <div class="form-group">
+          <label for="objectSelect">
+            <span class="material-symbols-rounded">inventory_2</span>
+            Select Object
+          </label>
+          <select id="objectSelect" class="object-select">
+            <option value="">-- Select Object --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="soqlWhere">
+            <span class="material-symbols-rounded">filter_alt</span>
+            Filter Records (SOQL WHERE clause - optional)
+          </label>
+          <input
+            type="text"
+            id="soqlWhere"
+            class="soql-input"
+            placeholder="e.g., Industry = 'Technology' AND AnnualRevenue > 1000000"
+            disabled
+          />
+          <small class="input-hint">Leave blank to migrate all records (limited to first 200)</small>
+        </div>
+
+        <div class="form-group">
+          <button id="previewRecordsBtn" class="btn btn-secondary" disabled>
+            <span class="material-symbols-rounded">preview</span>
+            Preview Records
+          </button>
+        </div>
+
+        <div id="recordsPreview" class="records-preview hidden">
+          <div class="preview-header">
+            <h3>Records Preview</h3>
+            <div class="record-count">
+              <span id="selectedRecordCount">0</span> of <span id="totalRecordCount">0</span> selected
+            </div>
+          </div>
+
+          <div class="table-actions">
+            <button id="selectAllBtn" class="btn btn-text">Select All</button>
+            <button id="deselectAllBtn" class="btn btn-text">Deselect All</button>
+          </div>
+
+          <div class="table-container">
+            <table id="recordsTable" class="records-table">
+              <thead>
+                <tr>
+                  <th class="checkbox-column">
+                    <input type="checkbox" id="selectAllCheckbox" />
+                  </th>
+                  <th>Record ID</th>
+                  <th>Name</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTableBody">
+                <!-- Records will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="step2BackBtn" class="btn btn-secondary">
+          <span class="material-symbols-rounded">arrow_back</span>
+          Back
+        </button>
+        <button id="step2NextBtn" class="btn btn-primary" disabled>
+          Next: Field Mapping
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: Field Mapping -->
+    <div class="wizard-step" id="step3">
+      <h2>Step 3: Field Mapping</h2>
+      <p class="step-description">Review and configure field mappings between source and target orgs.</p>
+
+      <div class="field-mapping-container">
+        <div class="form-group">
+          <button id="analyzeFieldsBtn" class="btn btn-secondary">
+            <span class="material-symbols-rounded">compare_arrows</span>
+            Analyze Field Differences
+          </button>
+        </div>
+
+        <div id="fieldMappingPreview" class="field-mapping-preview hidden">
+          <div class="preview-header">
+            <h3>Field Mapping Analysis</h3>
+            <div id="fieldMappingSummary" class="field-mapping-summary"></div>
+          </div>
+
+          <!-- Exact Matches -->
+          <div id="exactMatchesSection" class="mapping-section hidden">
+            <h4>
+              <span class="material-symbols-rounded status-ok">check_circle</span>
+              Exact Matches (<span id="exactMatchCount">0</span>)
+            </h4>
+            <p class="section-description">These fields match perfectly and will be migrated automatically.</p>
+            <div class="collapsible-content collapsed">
+              <div id="exactMatchesList" class="field-list"></div>
+            </div>
+          </div>
+
+          <!-- Type Mismatches -->
+          <div id="mismatchesSection" class="mapping-section hidden">
+            <h4>
+              <span class="material-symbols-rounded status-warning">warning</span>
+              Type Mismatches (<span id="mismatchCount">0</span>)
+            </h4>
+            <p class="section-description">These fields have different types. Data may be lost or transformed.</p>
+            <div id="mismatchesList" class="field-list"></div>
+          </div>
+
+          <!-- Missing in Target -->
+          <div id="missingFieldsSection" class="mapping-section hidden">
+            <h4>
+              <span class="material-symbols-rounded status-error">error</span>
+              Missing in Target (<span id="missingFieldCount">0</span>)
+            </h4>
+            <p class="section-description">These fields exist in source but not in target. Data will be skipped.</p>
+            <div id="missingFieldsList" class="field-list"></div>
+          </div>
+
+          <!-- Picklist Fields -->
+          <div id="picklistSection" class="mapping-section hidden">
+            <h4>
+              <span class="material-symbols-rounded">list</span>
+              Picklist Fields (<span id="picklistFieldCount">0</span>)
+            </h4>
+            <p class="section-description">These fields require picklist value mapping.</p>
+            <div id="picklistFieldsList" class="field-list"></div>
+            <button id="mapPicklistsBtn" class="btn btn-secondary">
+              <span class="material-symbols-rounded">tune</span>
+              Configure Picklist Mappings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="step3BackBtn" class="btn btn-secondary">
+          <span class="material-symbols-rounded">arrow_back</span>
+          Back
+        </button>
+        <button id="step3NextBtn" class="btn btn-primary">
+          Next: Configure Relationships
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 4: Relationship Configuration -->
+    <div class="wizard-step" id="step4">
+      <h2>Step 4: Configure Child Relationships</h2>
+      <p class="step-description">Select which child relationships to include in the migration.</p>
+
+      <div class="relationship-container">
+        <div class="form-group">
+          <button id="detectRelationshipsBtn" class="btn btn-secondary">
+            <span class="material-symbols-rounded">account_tree</span>
+            Detect Child Relationships
+          </button>
+        </div>
+
+        <div id="relationshipsPreview" class="relationships-preview hidden">
+          <div class="preview-header">
+            <h3>Child Relationships Found</h3>
+            <div id="selectedObjectName" class="selected-object"></div>
+          </div>
+
+          <div id="noRelationshipsMessage" class="empty-state hidden">
+            <span class="material-symbols-rounded">info</span>
+            <p>No child relationships found for this object.</p>
+          </div>
+
+          <div class="table-container">
+            <table id="relationshipsTable" class="relationships-table">
+              <thead>
+                <tr>
+                  <th class="checkbox-column">
+                    <input type="checkbox" id="selectAllRelationships" />
+                  </th>
+                  <th>Relationship Name</th>
+                  <th>Child Object</th>
+                  <th>Lookup Field</th>
+                  <th>Estimated Count</th>
+                </tr>
+              </thead>
+              <tbody id="relationshipsTableBody">
+                <!-- Relationships will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="step4BackBtn" class="btn btn-secondary">
+          <span class="material-symbols-rounded">arrow_back</span>
+          Back
+        </button>
+        <button id="step4NextBtn" class="btn btn-primary">
+          Next: Review & Migrate
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 5: Migration Preview & Execution -->
+    <div class="wizard-step" id="step5">
+      <h2>Step 5: Review and Execute Migration</h2>
+      <p class="step-description">Review your migration settings and start the migration process.</p>
+
+      <div class="migration-container">
+        <!-- External ID Configuration -->
+        <div class="external-id-config">
+          <h3>
+            <span class="material-symbols-rounded">key</span>
+            External ID Field Mapping (Optional)
+          </h3>
+          <p class="config-description">
+            Store source record IDs in an external ID field on the target org. This helps maintain reference links and enables future syncs.
+          </p>
+
+          <div class="form-group">
+            <label for="externalIdFieldSelect">
+              <input type="checkbox" id="useExternalIdCheckbox" checked />
+              Store source IDs in external ID field
+            </label>
+          </div>
+
+          <div id="externalIdFieldContainer" class="external-id-fields hidden">
+            <div class="form-group">
+              <label for="externalIdFieldSelect">Select External ID Field:</label>
+              <select id="externalIdFieldSelect" class="external-id-select">
+                <option value="">-- Select External ID Field --</option>
+              </select>
+              <button id="refreshExternalIdBtn" class="btn btn-text">
+                <span class="material-symbols-rounded">refresh</span>
+                Refresh Fields
+              </button>
+            </div>
+            <div class="info-message">
+              <span class="material-symbols-rounded">info</span>
+              Only External ID text fields from the target org are shown. The source record ID will be stored in this field.
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="migration-summary">
+          <h3>Migration Summary</h3>
+          <div class="summary-stats">
+            <div class="stat-item">
+              <span class="stat-label">Parent Records:</span>
+              <span class="stat-value" id="summaryParentCount">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Child Relationships:</span>
+              <span class="stat-value" id="summaryRelationshipCount">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Estimated Child Records:</span>
+              <span class="stat-value" id="summaryChildCount">~0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Total Operations:</span>
+              <span class="stat-value" id="summaryTotalOps">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Migration Progress (hidden until started) -->
+        <div id="migrationProgress" class="migration-progress hidden">
+          <h3>Migration Progress</h3>
+          <div class="progress-bar-container">
+            <div id="progressBar" class="progress-bar">
+              <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <div id="progressText" class="progress-text">0%</div>
+          </div>
+          <div id="currentStep" class="current-step">Ready to start...</div>
+        </div>
+
+        <!-- Migration Log -->
+        <div id="migrationLogContainer" class="migration-log-container hidden">
+          <div class="log-header">
+            <h3>Migration Log</h3>
+            <button id="exportLogBtn" class="btn btn-text" disabled>
+              <span class="material-symbols-rounded">download</span>
+              Export Log
+            </button>
+          </div>
+          <div id="migrationLog" class="migration-log">
+            <!-- Log entries will be appended here -->
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="step5BackBtn" class="btn btn-secondary">
+          <span class="material-symbols-rounded">arrow_back</span>
+          Back
+        </button>
+        <button id="startMigrationBtn" class="btn btn-primary">
+          <span class="material-symbols-rounded">play_arrow</span>
+          Start Migration
+        </button>
+        <button id="resetBtn" class="btn btn-text">
+          <span class="material-symbols-rounded">refresh</span>
+          Start Over
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="field-mapper.js"></script>
+  <script type="module" src="picklist-mapper.js"></script>
+  <script type="module" src="record-migrator.js"></script>
+</body>
+</html>

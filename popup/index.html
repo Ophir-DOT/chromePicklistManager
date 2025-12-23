@@ -76,6 +76,12 @@
             Org Compare Tool
           </button>
 
+          <button id="recordMigratorBtn" class="action-button locked-feature">
+            <span class="material-symbols-rounded icon">sync_alt</span>
+            Record Migrator
+            <span class="material-symbols-rounded lock-icon">lock</span>
+          </button>
+
           <button id="deploymentHistoryBtn" class="action-button">
             <span class="material-symbols-rounded icon">history</span>
             Deployment History
@@ -86,9 +92,15 @@
             Export Fields
           </button>
 
-          <button id="checkShareFilesBtn" class="action-button" disabled title="Available only on CompSuite__Document_Revision__c records">
+          <button id="checkShareFilesBtn" class="action-button locked-feature" disabled title="Password-protected feature">
             <span class="material-symbols-rounded icon">folder_shared</span>
             Check Share Files
+            <span class="material-symbols-rounded lock-icon">lock</span>
+          </button>
+
+          <button id="checkApprovalProcessBtn" class="action-button" disabled title="Check approval processes for the current record">
+            <span class="material-symbols-rounded icon">approval</span>
+            Check Approval Process
           </button>
 
           <button id="settingsBtn" class="action-button">
@@ -117,6 +129,66 @@
           <div id="shareFilesContent">
             <div class="loading-message">Loading share information...</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Approval Process View -->
+      <div id="approvalProcessView" class="hidden">
+        <div class="view-header">
+          <button id="backFromApprovalProcessBtn" class="back-button">← Back</button>
+          <h2>Approval Process Details</h2>
+        </div>
+
+        <div class="export-content">
+          <div id="approvalProcessContent">
+            <div class="loading-message">Loading approval processes...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Record Migrator Unlock View -->
+      <div id="recordMigratorUnlockView" class="hidden">
+        <div class="view-header">
+          <button id="backFromRecordMigratorUnlockBtn" class="back-button">← Back</button>
+          <h2>Record Migrator 🔒</h2>
+        </div>
+        <div class="unlock-content">
+          <div class="lock-icon-large">
+            <span class="material-symbols-rounded">lock</span>
+          </div>
+          <p>This feature is password-protected. Enter the password to unlock.</p>
+          <div class="form-group">
+            <label for="recordMigratorPassword">Password:</label>
+            <input type="password" id="recordMigratorPassword" placeholder="Enter password">
+          </div>
+          <button id="unlockRecordMigratorBtn" class="action-button primary">
+            <span class="material-symbols-rounded icon">lock_open</span>
+            Unlock
+          </button>
+          <div id="recordMigratorUnlockStatus" class="status-message"></div>
+        </div>
+      </div>
+
+      <!-- Share Files Unlock View -->
+      <div id="shareFilesUnlockView" class="hidden">
+        <div class="view-header">
+          <button id="backFromShareFilesUnlockBtn" class="back-button">← Back</button>
+          <h2>Check Share Files 🔒</h2>
+        </div>
+        <div class="unlock-content">
+          <div class="lock-icon-large">
+            <span class="material-symbols-rounded">lock</span>
+          </div>
+          <p>This feature is password-protected. Enter the password to unlock.</p>
+          <div class="form-group">
+            <label for="shareFilesPassword">Password:</label>
+            <input type="password" id="shareFilesPassword" placeholder="Enter password">
+          </div>
+          <button id="unlockShareFilesBtn" class="action-button primary">
+            <span class="material-symbols-rounded icon">lock_open</span>
+            Unlock
+          </button>
+          <div id="shareFilesUnlockStatus" class="status-message"></div>
         </div>
       </div>
     </main>

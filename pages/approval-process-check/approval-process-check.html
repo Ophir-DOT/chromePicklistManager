@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approval Process Check - DOT Toolkit</title>
+  <!-- Google Fonts: Quicksand (Headlines) and PT Serif (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=PT+Serif:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="../../popup/design-tokens.css">
+  <link rel="stylesheet" href="approval-process-check.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="header-content">
+        <h1>
+          <span class="material-symbols-rounded">approval</span>
+          Approval Process Check
+        </h1>
+        <div class="header-actions">
+          <button id="refreshBtn" class="btn btn-icon" title="Refresh">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+          <button id="exportBtn" class="btn btn-icon" title="Export to CSV">
+            <span class="material-symbols-rounded">download</span>
+          </button>
+        </div>
+      </div>
+      <p class="header-description">View approval process records for the current record</p>
+    </header>
+
+    <!-- Record Info Section -->
+    <div id="recordInfoSection" class="record-info-section">
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-label">Record ID:</span>
+          <span class="info-value" id="recordIdValue">Loading...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Object Type:</span>
+          <span class="info-value" id="objectTypeValue">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingSection" class="loading-section">
+      <div class="loading-spinner">
+        <span class="material-symbols-rounded spinning">progress_activity</span>
+      </div>
+      <p>Loading approval processes...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorSection" class="error-section hidden">
+      <div class="error-message">
+        <span class="material-symbols-rounded">error</span>
+        <div>
+          <strong>Error Loading Approval Processes</strong>
+          <p id="errorMessage"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptySection" class="empty-section hidden">
+      <div class="empty-state">
+        <span class="material-symbols-rounded">inbox</span>
+        <p>No approval processes found for this record</p>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="results-section hidden">
+      <div class="results-header">
+        <h2>Approval Processes (<span id="resultCount">0</span>)</h2>
+      </div>
+
+      <div class="table-container">
+        <table class="approval-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Process</th>
+              <th>Approval Process Init</th>
+              <th>Created Date</th>
+            </tr>
+          </thead>
+          <tbody id="approvalTableBody">
+            <!-- Results will be populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="approval-process-check.js"></script>
+</body>
+</html>

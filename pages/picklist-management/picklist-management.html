@@ -44,9 +44,10 @@
         <span class="material-symbols-rounded">account_tree</span>
         Export Dependencies
       </button>
-      <button class="tab-button" data-tab="picklist-loader">
+      <button class="tab-button locked-feature" data-tab="picklist-loader">
         <span class="material-symbols-rounded">upload_file</span>
         Picklist Loader
+        <span class="material-symbols-rounded lock-icon">lock</span>
       </button>
       <button class="tab-button locked-feature" data-tab="dependency-loader">
         <span class="material-symbols-rounded">cloud_upload</span>
@@ -128,9 +129,26 @@
       <!-- Picklist Loader Tab -->
       <div id="picklist-loader" class="tab-panel">
         <div class="panel-section">
-          <h2>Picklist Loader</h2>
-          <p class="section-description">Bulk load picklist values from CSV file. Values will be created (if new) or activated (if inactive).</p>
+          <h2>Picklist Loader 🔒</h2>
+          <p class="section-description">Bulk load picklist values from CSV file. This feature is password-protected.</p>
 
+          <div id="picklistLoaderUnlockSection" class="unlock-section">
+            <div class="lock-icon-large">
+              <span class="material-symbols-rounded">lock</span>
+            </div>
+            <p>This feature is password-protected. Enter the password to unlock.</p>
+            <div class="form-group">
+              <label for="picklistLoaderPassword">Password:</label>
+              <input type="password" id="picklistLoaderPassword" placeholder="Enter password">
+            </div>
+            <button id="unlockPicklistLoaderBtn" class="btn btn-primary">
+              <span class="material-symbols-rounded">lock_open</span>
+              Unlock
+            </button>
+            <div id="picklistLoaderUnlockStatus" class="status-message"></div>
+          </div>
+
+          <div id="picklistLoaderContent" class="hidden">
           <div class="form-row">
             <div class="form-group">
               <label for="updateObjectSelect">Object:</label>
@@ -148,23 +166,16 @@
           </div>
 
           <div class="form-group">
-            <label for="csvTextarea">CSV Values (one per line):</label>
-            <textarea id="csvTextarea" rows="10" placeholder="Enter picklist values, one per line:
-Value 1
-Value 2
-Value 3
+            <label for="csvTextarea">CSV Values (Label,API Name format):</label>
+            <textarea id="csvTextarea" rows="10" placeholder="Enter picklist values or copy-paste from Excel:
 
-Or paste CSV with header:
-PicklistValue
-Value 1
-Value 2"></textarea>
-          </div>
+Label,API Name
+Small Business,Small_Business
+Medium Business,Medium_Business
+Enterprise,Enterprise
 
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="overwriteCheckbox">
-              <span>Overwrite Mode (deactivate values not in CSV)</span>
-            </label>
+💡 Supports CSV (comma-separated) and Excel (tab-separated)
+Both columns are required. Header row is optional."></textarea>
           </div>
 
           <div class="form-actions">
@@ -190,6 +201,7 @@ Value 2"></textarea>
           </div>
 
           <div id="updatePicklistStatus" class="status-message"></div>
+          </div>
         </div>
       </div>
 

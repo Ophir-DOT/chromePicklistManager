@@ -668,3 +668,9 @@ class ExportFieldsManager {
     return 'No records have a value in this field';
   }
 }
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const manager = new ExportFieldsManager();
+  manager.init();
+});

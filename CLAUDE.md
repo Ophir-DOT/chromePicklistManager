@@ -75,6 +75,12 @@ chromePicklistManager/
 ├── icons/
 ├── lib/
 │   └── jszip.min.js           # ZIP creation for deployments
+├── doc/                       # Documentation files (plans, guides, status)
+│   ├── plan/                  # Implementation plans
+│   ├── status/                # Status updates
+│   ├── progress/              # Progress reports
+│   ├── guide/                 # Testing/user guides
+│   └── feature/               # Feature specifications
 └── tests/
     ├── fixtures/              # Playwright extension fixtures
     ├── e2e/                   # End-to-end tests
@@ -338,6 +344,40 @@ Place mock API responses in `tests/mocks/`. Match Salesforce API response struct
 1. Update CSS variables in the relevant stylesheet
 2. Ensure both light and dark mode values are set
 3. Test with system preference toggle
+
+### Documentation Files
+
+**IMPORTANT**: All markdown documentation files (except `README.md` and `CLAUDE.md`) must be placed in the `doc/` folder with appropriate sub-folders based on document type.
+
+**Folder Structure**:
+```
+doc/
+├── plan/           # Implementation plans, feature designs
+├── status/         # Status updates, progress tracking
+├── progress/       # Development progress reports
+├── guide/          # Testing guides, user guides, how-tos
+├── feature/        # Feature specifications, requirements
+└── archive/        # Completed/outdated documentation
+```
+
+**Naming Conventions**:
+- Use SCREAMING_SNAKE_CASE for document names: `FEATURE_NAME_TYPE.md`
+- Examples:
+  - `doc/plan/RECORD_MIGRATOR_PLAN.md`
+  - `doc/status/RECORD_MIGRATOR_STATUS.md`
+  - `doc/guide/RECORD_MIGRATOR_TESTING_GUIDE.md`
+  - `doc/feature/STATE_REMAPPING_FEATURE.md`
+
+**When Creating Documentation**:
+1. Determine the document type (plan, status, guide, feature, etc.)
+2. Create in appropriate sub-folder under `doc/`
+3. If sub-folder doesn't exist, create it
+4. Never place `.md` files in project root (except README.md, CLAUDE.md, CHANGELOG.md)
+
+**Exceptions** (files that stay in root):
+- `README.md` - Project overview
+- `CLAUDE.md` - AI development context
+- `CHANGELOG.md` - Version history
 
 ### Version Management
 
