@@ -1,9 +1,9 @@
 // Batch Job Monitor
 // Displays and manages Salesforce asynchronous jobs
 
-import ThemeManager from '../background/theme-manager.js';
-import BatchJobAPI from '../background/batch-job-api.js';
-import SessionManager from '../background/session-manager.js';
+import ThemeManager from '../../background/theme-manager.js';
+import BatchJobAPI from '../../background/batch-job-api.js';
+import SessionManager from '../../background/session-manager.js';
 
 class BatchJobMonitor {
   constructor() {

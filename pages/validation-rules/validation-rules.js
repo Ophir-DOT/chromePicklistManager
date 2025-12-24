@@ -1,9 +1,9 @@
 // Validation Rules Manager UI Controller
 // Provides interface for managing Salesforce validation rules
 
-import ThemeManager from '../background/theme-manager.js';
-import SessionManager from '../background/session-manager.js';
-import ValidationRuleAPI from '../background/validation-rule-api.js';
+import ThemeManager from '../../background/theme-manager.js';
+import SessionManager from '../../background/session-manager.js';
+import ValidationRuleAPI from '../../background/validation-rule-api.js';
 
 class ValidationRulesManager {
   constructor() {

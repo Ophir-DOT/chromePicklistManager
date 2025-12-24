@@ -1,8 +1,8 @@
-import ThemeManager from '../background/theme-manager.js';
-import SessionManager from '../background/session-manager.js';
-import ExportFieldsAPI from '../background/export-fields-api.js';
-import FieldUsageAPI from '../background/field-usage-api.js';
-import { escapeHtml } from '../shared/utils.js';
+import ThemeManager from '../../background/theme-manager.js';
+import SessionManager from '../../background/session-manager.js';
+import ExportFieldsAPI from '../../background/export-fields-api.js';
+import FieldUsageAPI from '../../background/field-usage-api.js';
+import { escapeHtml } from '../../shared/utils.js';
 
 class ExportFieldsManager {
   constructor() {

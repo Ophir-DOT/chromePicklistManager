@@ -1,8 +1,8 @@
 // Org Compare Tool UI Logic
 // Handles session detection, metadata comparison, and results display
 
-import OrgCompareAPI from '../background/org-compare-api.js';
-import ThemeManager from '../background/theme-manager.js';
+import OrgCompareAPI from '../../background/org-compare-api.js';
+import ThemeManager from '../../background/theme-manager.js';
 
 // Global state
 let availableSessions = [];

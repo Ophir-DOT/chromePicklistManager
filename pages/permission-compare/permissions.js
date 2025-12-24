@@ -1,10 +1,10 @@
 // Permission Comparison UI Controller
 // Provides interface for comparing Salesforce Profile and Permission Set permissions
 
-import ThemeManager from '../background/theme-manager.js';
-import SessionManager from '../background/session-manager.js';
-import PermissionsAPI from '../background/permissions-api.js';
-import { escapeHtml } from '../shared/utils.js';
+import ThemeManager from '../../background/theme-manager.js';
+import SessionManager from '../../background/session-manager.js';
+import PermissionsAPI from '../../background/permissions-api.js';
+import { escapeHtml } from '../../shared/utils.js';
 
 class PermissionComparisonManager {
   constructor() {

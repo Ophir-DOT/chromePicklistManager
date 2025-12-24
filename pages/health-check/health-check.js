@@ -1,8 +1,8 @@
 // Progressive DOT Health Check
 // Executes health checks sequentially with real-time UI updates
 
-import ThemeManager from '../background/theme-manager.js';
-import { escapeHtml } from '../shared/utils.js';
+import ThemeManager from '../../background/theme-manager.js';
+import { escapeHtml } from '../../shared/utils.js';
 
 class ProgressiveHealthCheck {
   constructor() {
