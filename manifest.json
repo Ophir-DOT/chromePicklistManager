@@ -7,7 +7,6 @@
   "permissions": [
     "cookies",
     "storage",
-    "scripting",
     "notifications"
   ],
 
