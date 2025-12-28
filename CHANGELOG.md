@@ -5,6 +5,14 @@ All notable changes to Salesforce Picklist Manager will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2025-12-28
+
+### Fixed
+
+- **Chrome Web Store Compliance**: Removed unused `scripting` permission from manifest
+  - Resolves violation "Purple Potassium" - requesting but not using scripting permission
+  - Extension uses declarative content script injection which doesn't require this permission
+
 ## [1.7.0] - 2025-11-25
 
 ### Focus: UI Improvements, Org Compare Enhancements, Deployment Tracking & Picklist Consolidation
